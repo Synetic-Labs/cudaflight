@@ -27,7 +27,7 @@ MCU_COMMON_SRC  := \
 #Flags
 ARCH_FLAGS      =
 DEVICE_FLAGS    =
-LD_SCRIPT       = $(LINKER_DIR)/sitl_lockstep.ld
+LD_SCRIPT       = $(LINKER_DIR)/sitl.ld
 STARTUP_SRC     =
 
 MCU_FLASH_SIZE  := 2048
@@ -49,9 +49,6 @@ TARGET_MAP  = $(OBJECT_DIR)/$(FORKNAME)_$(TARGET).map
 
 LIBS        = -lm -lpthread -lc -lrt
 
-# --emit-relocs keeps static relocation records in the executable; the
-# multi-instance state manager reads them at startup to rebase pointers
-# inside each instance's copy of the mutable image.
 LD_FLAGS    := \
             $(LIBS) \
             $(ARCH_FLAGS) \
@@ -60,7 +57,6 @@ LD_FLAGS    := \
             -Wl,-gc-sections,-Map,$(TARGET_MAP) \
             -Wl,-L$(LINKER_DIR) \
             -Wl,--cref \
-            -Wl,--emit-relocs \
             -Wl,-z,noexecstack \
             -T$(LD_SCRIPT)
 

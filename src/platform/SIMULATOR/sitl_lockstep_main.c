@@ -144,6 +144,8 @@ int main(int argc, char *argv[])
 
     setvbuf(stdout, NULL, _IOLBF, 0);
 
+    bflInstanceTemplateFixup();
+
     if (numInstances < 1) {
         numInstances = 1;
     }

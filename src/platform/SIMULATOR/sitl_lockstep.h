@@ -74,5 +74,11 @@ void bflGetMotorsNormalised(float *out, unsigned maxCount);
 uint64_t bflGetMotorUpdateCount(void);
 
 // Override the EEPROM backing file path (default: EEPROM_FILENAME).
-// Must be called before init.
+// NULL selects RAM-only mode (no file I/O; eepromData is firmware state
+// and therefore per-instance). Must be called before init.
 void bflSetEepromPath(const char *path);
+
+// Direct access to the EEPROM backing store of the active instance, for
+// host-side preloading in RAM-only mode.
+uint8_t *bflEepromBuffer(void);
+uint32_t bflEepromSize(void);

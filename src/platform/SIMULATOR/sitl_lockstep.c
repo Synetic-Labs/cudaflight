@@ -467,10 +467,17 @@ char _estack;
 char _Min_Stack_Size;
 
 // ===========================================================================
-// Virtual EEPROM (file backed, path overridable for parallel instances)
+// Virtual EEPROM. File backed by default (path overridable for parallel
+// instances); BFL_EEPROM_RAM (the GPU build) drops all file I/O and works
+// purely on eepromData, which is firmware state and therefore per-instance.
+// A NULL path selects the same RAM-only behaviour at runtime.
 // ===========================================================================
 
+#ifdef BFL_EEPROM_RAM
+static const char *eepromPath = NULL;
+#else
 static const char *eepromPath = EEPROM_FILENAME;
+#endif
 static FILE *eepromFd = NULL;
 
 void bflSetEepromPath(const char *path)
@@ -478,8 +485,21 @@ void bflSetEepromPath(const char *path)
     eepromPath = path;
 }
 
+uint8_t *bflEepromBuffer(void)
+{
+    return eepromData;
+}
+
+uint32_t bflEepromSize(void)
+{
+    return sizeof(eepromData);
+}
+
 bool loadEEPROMFromFile(void)
 {
+    if (eepromPath == NULL) {
+        return true; // RAM-backed: fly with whatever eepromData holds
+    }
     if (eepromFd != NULL) {
         fprintf(stderr, "[FLASH_Unlock] eepromFd != NULL\n");
         return false;
@@ -522,6 +542,9 @@ void configUnlock(void)
 
 void configLock(void)
 {
+    if (eepromPath == NULL) {
+        return; // RAM-backed: nothing to persist
+    }
     // flush & close
     if (eepromFd != NULL) {
         fseek(eepromFd, 0, SEEK_SET);

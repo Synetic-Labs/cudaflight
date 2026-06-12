@@ -19,12 +19,11 @@
  */
 
 // Per-instance firmware state manager for SITL_LOCKSTEP multi-instance
-// builds (see tools/lockstep_instancer/). Each instance is a heap copy
-// of the firmware's mutable image [__bf_inst_start, __bf_inst_end);
-// in-range pointers inside the copy are rebased using the relocation
-// records the linker kept in the executable (--emit-relocs). Activating
-// an instance sets __bf_delta, which instanced firmware code adds to
-// every state access.
+// builds (see tools/lockstep_instancer/). The instancer packs all mutable
+// firmware state into one template image (@__bf_image) and emits layout
+// tables; each instance is a heap copy of that image with the recorded
+// pointer slots rebased. Activating an instance sets __bf_delta, which
+// instanced firmware code adds to every state access.
 
 #pragma once
 
@@ -35,6 +34,11 @@
 // True when this binary was built through the IR instancer (i.e. firmware
 // state accesses honour __bf_delta and N > 1 is meaningful).
 bool bflInstancingAvailable(void);
+
+// Patch the template's in-image pointer slots (nulled in the static
+// initializer for GPU-backend compatibility). Must run before any
+// firmware init. No-op in non-instanced builds.
+void bflInstanceTemplateFixup(void);
 
 // Allocate and initialise `count` pristine instance images. Call once,
 // before any firmware init. Returns 0 on success.
