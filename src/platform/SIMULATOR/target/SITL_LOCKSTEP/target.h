@@ -33,3 +33,8 @@
 // worker threads exist, so the multithread sync hooks must stay off.
 #undef ENABLE_SIMULATOR_MULTITHREAD
 #define ENABLE_SIMULATOR_MULTITHREAD 0
+
+// Stock SITL takes attitude from the simulator (#undef USE_IMU_CALC);
+// the lockstep build closes the loop through real sensors instead, so
+// the firmware must run its own attitude estimation as on hardware.
+#define USE_IMU_CALC

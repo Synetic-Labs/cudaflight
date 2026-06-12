@@ -24,6 +24,11 @@
 // deterministic input profile and emits an FNV-1a hash of every motor
 // output sample. Two runs of the same binary must print the same hash;
 // any future port (multi-instance, GPU) must reproduce it bit-exactly.
+//
+// The loop is closed: a quad rigid-body model (sitl_lockstep_physics.c)
+// turns the firmware's motor outputs into the gyro/acc/baro readings it
+// sees on the next step, so the PID loop flies a real (simulated)
+// airframe rather than a canned sensor profile.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -42,17 +47,15 @@
 #include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
 
-#include "flight/pid.h"
-
 #include "sitl_lockstep.h"
+#include "sitl_lockstep_physics.h"
 
 #define CONTROL_STEP_US     1000    // inject sensors/RC and sample motors at 1kHz
 #define SETTLE_SECONDS      6       // gyro calibration + 5s arming boot grace period
 #define ARM_SECONDS         1
 #define DEFAULT_FLY_SECONDS 10
 
-#define ONE_G_MSS           9.80665
-#define SEA_LEVEL_PA        101325
+#define HOVER_THROTTLE      1680    // slightly above hover for the model in sitl_lockstep_physics.c
 
 static uint64_t fnv1a64(uint64_t hash, const void *data, size_t len)
 {
@@ -67,16 +70,13 @@ static uint64_t fnv1a64(uint64_t hash, const void *data, size_t len)
 static uint16_t rc[BFL_MAX_RC_CHANNELS];
 static uint64_t traceHash = 0xcbf29ce484222325ULL; // FNV-1a offset basis
 static uint64_t samples = 0;
-
-static void injectLevelSensors(void)
-{
-    bflSetGyroAccel(0.0, 0.0, 0.0, 0.0, 0.0, -ONE_G_MSS);
-    bflSetAttitudeQuat(1.0f, 0.0f, 0.0f, 0.0f);
-    bflSetBaro(SEA_LEVEL_PA);
-}
+static quadSim_t sim;
 
 static void controlStep(void)
 {
+    // physics turns the previous step's motor outputs into this step's
+    // sensor readings, then the firmware advances against them
+    quadSimStep(&sim, CONTROL_STEP_US * 1e-6);
     bflSetRc(rc, BFL_MAX_RC_CHANNELS);
     bflStepUs(CONTROL_STEP_US);
 
@@ -140,10 +140,6 @@ int main(int argc, char *argv[])
     modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(2100);
     analyzeModeActivationConditions();
 
-    // No physics loop closes motor output back into the gyro yet, which
-    // is exactly the signature runaway takeoff prevention disarms on
-    pidConfigMutable()->runaway_takeoff_prevention = false;
-
     // RC defaults: sticks centred, throttle low, all aux low (AETR map)
     for (int i = 0; i < BFL_MAX_RC_CHANNELS; i++) {
         rc[i] = 1500;
@@ -153,8 +149,8 @@ int main(int argc, char *argv[])
         rc[i] = 1000;
     }
 
-    // Settle: level, motionless, let gyro calibration complete
-    injectLevelSensors();
+    // Settle: on the ground, level, motionless; gyro calibration completes
+    quadSimInit(&sim);
     for (int ms = 0; ms < SETTLE_SECONDS * 1000; ms++) {
         controlStep();
     }
@@ -175,42 +171,44 @@ int main(int argc, char *argv[])
            (unsigned)(bflMicros() / 1000), bflGetMotorCount(),
            (unsigned long long)bflGetMotorUpdateCount());
 
-    // Fly: deterministic stick + gyro profile, all generated with the
-    // firmware's own polynomial trig so the trace is libm independent
+    // Fly: take off, then gentle stick wiggles. The sticks are the only
+    // open-loop input now; rates, attitude and altitude come from the
+    // physics responding to the firmware's motor outputs.
     for (int ms = 0; ms < flySeconds * 1000; ms++) {
         const float t = ms * 0.001f;
 
-        // throttle ramps 1000 -> 1600 over 2s, then holds
-        rc[2] = (t < 2.0f) ? (uint16_t)(1000 + 300 * t) : 1600;
-        // gentle stick wiggles
-        rc[0] = (uint16_t)(1500 + 200 * sin_approx(2.0f * M_PIf * 0.5f * t));
-        rc[1] = (uint16_t)(1500 + 150 * sin_approx(2.0f * M_PIf * 0.3f * t + 1.0f));
-        rc[3] = (uint16_t)(1500 + 100 * sin_approx(2.0f * M_PIf * 0.2f * t + 2.0f));
-
-        // body rates loosely tracking the sticks plus a fast wobble,
-        // as a stand-in for real dynamics
-        const double gx = 2.0 * (double)sin_approx(2.0f * M_PIf * 0.5f * t) + 0.3 * (double)sin_approx(2.0f * M_PIf * 13.0f * t);
-        const double gy = 1.5 * (double)sin_approx(2.0f * M_PIf * 0.3f * t + 1.0f) + 0.2 * (double)sin_approx(2.0f * M_PIf * 17.0f * t);
-        const double gz = 1.0 * (double)sin_approx(2.0f * M_PIf * 0.2f * t + 2.0f);
-        const double az = -ONE_G_MSS * (0.8 + 0.4 * (rc[2] - 1000) * 0.001);
-        bflSetGyroAccel(gx, gy, gz, 0.0, 0.0, az);
-        bflSetBaro(SEA_LEVEL_PA);
+        // throttle ramps to just above hover over 2s, then holds
+        rc[2] = (t < 2.0f) ? (uint16_t)(1000 + (HOVER_THROTTLE - 1000) * 0.5f * t) : HOVER_THROTTLE;
+        // gentle stick wiggles after the climb is established
+        if (t >= 3.0f) {
+            rc[0] = (uint16_t)(1500 + 100 * sin_approx(2.0f * M_PIf * 0.5f * t));
+            rc[1] = (uint16_t)(1500 + 80 * sin_approx(2.0f * M_PIf * 0.3f * t + 1.0f));
+            rc[3] = (uint16_t)(1500 + 60 * sin_approx(2.0f * M_PIf * 0.2f * t + 2.0f));
+        } else {
+            rc[0] = rc[1] = rc[3] = 1500;
+        }
 
         controlStep();
 
         if (trace || (ms % 1000) == 0) {
             float m[4];
+            double roll, pitch, yaw;
             bflGetMotorsPwm(m, 4);
-            printf("[trace] t=%5.2fs thr=%u motors= %7.2f %7.2f %7.2f %7.2f\n",
-                   (double)t, rc[2], (double)m[0], (double)m[1], (double)m[2], (double)m[3]);
+            quadSimEulerDeg(&sim, &roll, &pitch, &yaw);
+            printf("[trace] t=%5.2fs thr=%u alt=%6.2fm rpy=%6.1f %6.1f %6.1f rates=%6.1f %6.1f %6.1f motors= %7.2f %7.2f %7.2f %7.2f\n",
+                   (double)t, rc[2], quadSimAltitude(&sim), roll, pitch, yaw,
+                   sim.omega[0] * 180.0 / 3.14159265358979, sim.omega[1] * 180.0 / 3.14159265358979, sim.omega[2] * 180.0 / 3.14159265358979,
+                   (double)m[0], (double)m[1], (double)m[2], (double)m[3]);
         }
     }
 
     const bool stillArmed = ARMING_FLAG(ARMED);
-    printf("[harness] done: t=%ums samples=%llu motorUpdates=%llu armed=%d\n",
+    const bool airborne = quadSimAltitude(&sim) > 1.0;
+    printf("[harness] done: t=%ums samples=%llu motorUpdates=%llu armed=%d alt=%.2fm airborne=%d\n",
            (unsigned)(bflMicros() / 1000), (unsigned long long)samples,
-           (unsigned long long)bflGetMotorUpdateCount(), stillArmed);
+           (unsigned long long)bflGetMotorUpdateCount(), stillArmed,
+           quadSimAltitude(&sim), airborne);
     printf("TRACE_HASH: %016llx\n", (unsigned long long)traceHash);
 
-    return stillArmed ? 0 : 3;
+    return (stillArmed && airborne) ? 0 : 3;
 }

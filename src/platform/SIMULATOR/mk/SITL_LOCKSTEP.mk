@@ -16,6 +16,7 @@ INCLUDE_DIRS := \
 MCU_COMMON_SRC  := \
         $(LIB_MAIN_DIR)/dyad/dyad.c \
         SIMULATOR/sitl_lockstep.c \
+        SIMULATOR/sitl_lockstep_physics.c \
         SIMULATOR/sitl_lockstep_main.c
 
 #Flags
