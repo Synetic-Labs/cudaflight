@@ -21,7 +21,6 @@ README.pdf
 
 # artefacts of top-level Makefile
 /downloads/
-/tools/
 /build/
 # local changes only
 mk/local.mk
