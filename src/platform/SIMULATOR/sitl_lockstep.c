@@ -68,10 +68,10 @@
 
 #include "rx/rx.h"
 
+#include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
+#include "sensors/gyro.h"
 #include "sensors/sensors.h"
-
-#include "dyad.h"
 
 #include "sitl_lockstep.h"
 
@@ -200,11 +200,6 @@ void systemInit(void)
     printf("[SITL_LOCKSTEP] System init, deterministic virtual clock\n");
 
     SystemCoreClock = 500 * 1e6; // virtual 500MHz
-
-    // serial_tcp.c creates dyad streams on uartOpen; initialise the
-    // library, but no thread ever calls dyad_update so no I/O is
-    // processed and the firmware never observes external data.
-    dyad_init();
 }
 
 void systemReset(void)
@@ -407,6 +402,39 @@ bool motorPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig,
     return true;
 }
 
+// Armed state accessor for the harness. The harness is native (never IR
+// instanced) so it must not read firmware globals like armingFlags
+// directly: in a multi-instance build that would hit the pristine
+// template image instead of the active instance. This function is
+// firmware-side, so its access is rewritten with the rest.
+bool bflIsArmed(void)
+{
+    return ARMING_FLAG(ARMED);
+}
+
+// Map ARM to AUX1 high (equivalent of CLI: aux 0 0 0 1700 2100 0 0).
+// Must live firmware-side: modeActivationConditionsMutable() is a
+// static-inline PG accessor, and inlined into the native harness it
+// would write the template image instead of the active instance.
+void bflConfigureArmSwitch(void)
+{
+    modeActivationConditionsMutable(0)->modeId = BOXARM;
+    modeActivationConditionsMutable(0)->auxChannelIndex = 0;
+    modeActivationConditionsMutable(0)->range.startStep = CHANNEL_VALUE_TO_STEP(1700);
+    modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(2100);
+    analyzeModeActivationConditions();
+}
+
+// Firmware-eye view of the active instance, for harness debugging.
+void bflDebugStatus(void)
+{
+    printf("[debug] t=%uus rc=%.0f/%.0f/%.0f/%.0f/%.0f armBox=%d gyroCal=%d disable=0x%x armed=%d\n",
+           (unsigned)micros64(),
+           (double)rcData[0], (double)rcData[1], (double)rcData[2], (double)rcData[3], (double)rcData[4],
+           IS_RC_MODE_ACTIVE(BOXARM), gyroIsCalibrationComplete(),
+           (unsigned)getArmingDisableFlags(), ARMING_FLAG(ARMED) ? 1 : 0);
+}
+
 uint16_t bflGetMotorCount(void)
 {
     return pwmMotorCount;
@@ -573,6 +601,13 @@ void EXTIInit(void)
 {
     // NOOP
 }
+
+// SERIAL_TRAIT_PIN_CONFIG is 0 on SIMULATOR so drivers/serial_pinconfig.c
+// compiles empty, but init.c still references the serialPinConfig() PG
+// accessor under USE_UART. Stock SITL only links because gcc-LTO strips
+// the reference through the no-op below; this build doesn't use LTO, so
+// provide the parameter group here.
+PG_REGISTER(serialPinConfig_t, serialPinConfig, PG_SERIAL_PIN_CONFIG, 0);
 
 void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
 {

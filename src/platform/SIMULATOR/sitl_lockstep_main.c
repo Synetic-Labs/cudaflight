@@ -20,15 +20,13 @@
 
 // Golden-trace harness for the SITL_LOCKSTEP target.
 //
-// Boots the firmware against the virtual clock, arms it, flies a
-// deterministic input profile and emits an FNV-1a hash of every motor
-// output sample. Two runs of the same binary must print the same hash;
-// any future port (multi-instance, GPU) must reproduce it bit-exactly.
-//
-// The loop is closed: a quad rigid-body model (sitl_lockstep_physics.c)
-// turns the firmware's motor outputs into the gyro/acc/baro readings it
-// sees on the next step, so the PID loop flies a real (simulated)
-// airframe rather than a canned sensor profile.
+// Boots N firmware instances against the virtual clock, arms them, flies
+// a deterministic closed-loop profile (quad rigid body in
+// sitl_lockstep_physics.c) and emits an FNV-1a hash of every motor output
+// sample per instance. All unperturbed instances must produce the same
+// hash, bit-identical to a single-instance run; a --perturb'd instance
+// must diverge without affecting the others. This is the oracle every
+// port (multi-instance CPU, GPU) has to satisfy.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -48,6 +46,7 @@
 #include "fc/runtime_config.h"
 
 #include "sitl_lockstep.h"
+#include "sitl_lockstep_instance.h"
 #include "sitl_lockstep_physics.h"
 
 #define CONTROL_STEP_US     1000    // inject sensors/RC and sample motors at 1kHz
@@ -56,6 +55,19 @@
 #define DEFAULT_FLY_SECONDS 10
 
 #define HOVER_THROTTLE      1680    // slightly above hover for the model in sitl_lockstep_physics.c
+
+#define NO_PERTURB          UINT32_MAX
+
+typedef struct {
+    quadSim_t sim;
+    uint16_t rc[BFL_MAX_RC_CHANNELS];
+    uint64_t hash;
+    bool perturbed;
+} instance_t;
+
+static instance_t *insts;
+static unsigned numInstances = 1;
+static uint64_t samples = 0;
 
 static uint64_t fnv1a64(uint64_t hash, const void *data, size_t len)
 {
@@ -67,23 +79,25 @@ static uint64_t fnv1a64(uint64_t hash, const void *data, size_t len)
     return hash;
 }
 
-static uint16_t rc[BFL_MAX_RC_CHANNELS];
-static uint64_t traceHash = 0xcbf29ce484222325ULL; // FNV-1a offset basis
-static uint64_t samples = 0;
-static quadSim_t sim;
+static void activate(unsigned k)
+{
+    if (numInstances > 1) {
+        bflInstanceActivate(k);
+    }
+}
 
-static void controlStep(void)
+static void controlStep(unsigned k)
 {
     // physics turns the previous step's motor outputs into this step's
     // sensor readings, then the firmware advances against them
-    quadSimStep(&sim, CONTROL_STEP_US * 1e-6);
-    bflSetRc(rc, BFL_MAX_RC_CHANNELS);
+    activate(k);
+    quadSimStep(&insts[k].sim, CONTROL_STEP_US * 1e-6);
+    bflSetRc(insts[k].rc, BFL_MAX_RC_CHANNELS);
     bflStepUs(CONTROL_STEP_US);
 
     float motors[4];
     bflGetMotorsPwm(motors, 4);
-    traceHash = fnv1a64(traceHash, motors, sizeof(motors));
-    samples++;
+    insts[k].hash = fnv1a64(insts[k].hash, motors, sizeof(motors));
 }
 
 static void printArmingDisableFlags(void)
@@ -106,109 +120,191 @@ int main(int argc, char *argv[])
 {
     int flySeconds = DEFAULT_FLY_SECONDS;
     bool trace = false;
+    const char *eepromBase = NULL;
+    unsigned perturb = NO_PERTURB;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--seconds") == 0 && i + 1 < argc) {
             flySeconds = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--eeprom") == 0 && i + 1 < argc) {
-            bflSetEepromPath(argv[++i]);
+            eepromBase = argv[++i];
+        } else if (strcmp(argv[i], "--instances") == 0 && i + 1 < argc) {
+            numInstances = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--perturb") == 0 && i + 1 < argc) {
+            perturb = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--trace") == 0) {
             trace = true;
         } else {
-            fprintf(stderr, "usage: %s [--seconds N] [--eeprom FILE] [--trace]\n", argv[0]);
+            fprintf(stderr,
+                    "usage: %s [--seconds N] [--eeprom FILE] [--instances N] [--perturb K] [--trace]\n",
+                    argv[0]);
             return 1;
         }
     }
 
     setvbuf(stdout, NULL, _IOLBF, 0);
 
+    if (numInstances < 1) {
+        numInstances = 1;
+    }
+    if (numInstances > 1 && bflInstancesCreate(numInstances) != 0) {
+        return 1;
+    }
+
+    insts = calloc(numInstances, sizeof(*insts));
+
+    // Boot every instance through the real init path
+    for (unsigned k = 0; k < numInstances; k++) {
+        activate(k);
+
+        if (eepromBase) {
+            if (k == 0) {
+                bflSetEepromPath(eepromBase);
+            } else {
+                char *path = malloc(strlen(eepromBase) + 16);
+                sprintf(path, "%s.%u", eepromBase, k);
+                bflSetEepromPath(path);
+            }
+        }
+
 #if SERIAL_PORT_COUNT > 0
-    printfSerialInit();
+        printfSerialInit();
 #endif
+        systemInit();
+        initPhase1();
+        initPhase2();
+        initPhase3();
 
-    systemInit();
-    initPhase1();
-    initPhase2();
-    initPhase3();
+        // Map ARM to AUX1 high (firmware-side helper: PG accessors are
+        // static-inline and must not be inlined into this native file)
+        bflConfigureArmSwitch();
 
-    printf("[harness] init complete at t=%uus\n", (unsigned)bflMicros());
+        // RC defaults: sticks centred, throttle low, all aux low (AETR map)
+        for (int i = 0; i < BFL_MAX_RC_CHANNELS; i++) {
+            insts[k].rc[i] = 1500;
+        }
+        insts[k].rc[2] = 1000; // throttle
+        for (int i = 4; i < BFL_MAX_RC_CHANNELS; i++) {
+            insts[k].rc[i] = 1000;
+        }
 
-    // Map ARM to AUX1 high (equivalent of CLI: aux 0 0 0 1700 2100 0 0)
-    modeActivationConditionsMutable(0)->modeId = BOXARM;
-    modeActivationConditionsMutable(0)->auxChannelIndex = 0;
-    modeActivationConditionsMutable(0)->range.startStep = CHANNEL_VALUE_TO_STEP(1700);
-    modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(2100);
-    analyzeModeActivationConditions();
-
-    // RC defaults: sticks centred, throttle low, all aux low (AETR map)
-    for (int i = 0; i < BFL_MAX_RC_CHANNELS; i++) {
-        rc[i] = 1500;
+        quadSimInit(&insts[k].sim);
+        insts[k].hash = 0xcbf29ce484222325ULL; // FNV-1a offset basis
+        insts[k].perturbed = (k == perturb);
     }
-    rc[2] = 1000; // throttle
-    for (int i = 4; i < BFL_MAX_RC_CHANNELS; i++) {
-        rc[i] = 1000;
-    }
+    printf("[harness] %u instance(s) initialised at t=%uus\n",
+           numInstances, (unsigned)bflMicros());
 
     // Settle: on the ground, level, motionless; gyro calibration completes
-    quadSimInit(&sim);
     for (int ms = 0; ms < SETTLE_SECONDS * 1000; ms++) {
-        controlStep();
+        for (unsigned k = 0; k < numInstances; k++) {
+            controlStep(k);
+        }
+        samples++;
     }
-    printArmingDisableFlags();
 
     // Arm
-    rc[4] = 1800; // AUX1 high
+    for (unsigned k = 0; k < numInstances; k++) {
+        insts[k].rc[4] = 1800; // AUX1 high
+    }
     for (int ms = 0; ms < ARM_SECONDS * 1000; ms++) {
-        controlStep();
+        for (unsigned k = 0; k < numInstances; k++) {
+            controlStep(k);
+        }
+        samples++;
     }
 
-    if (!ARMING_FLAG(ARMED)) {
-        fprintf(stderr, "[harness] FAILED to arm\n");
-        printArmingDisableFlags();
-        return 2;
+    for (unsigned k = 0; k < numInstances; k++) {
+        activate(k);
+        if (!bflIsArmed()) {
+            fprintf(stderr, "[harness] instance %u FAILED to arm\n", k);
+            printArmingDisableFlags();
+            bflDebugStatus();
+            return 2;
+        }
     }
-    printf("[harness] armed at t=%ums, motors=%u, motorUpdates=%llu\n",
+    printf("[harness] all armed at t=%ums, motors=%u, motorUpdates=%llu\n",
            (unsigned)(bflMicros() / 1000), bflGetMotorCount(),
            (unsigned long long)bflGetMotorUpdateCount());
 
     // Fly: take off, then gentle stick wiggles. The sticks are the only
-    // open-loop input now; rates, attitude and altitude come from the
-    // physics responding to the firmware's motor outputs.
+    // open-loop input; rates, attitude and altitude come from the physics
+    // responding to each instance's own motor outputs.
     for (int ms = 0; ms < flySeconds * 1000; ms++) {
         const float t = ms * 0.001f;
 
-        // throttle ramps to just above hover over 2s, then holds
-        rc[2] = (t < 2.0f) ? (uint16_t)(1000 + (HOVER_THROTTLE - 1000) * 0.5f * t) : HOVER_THROTTLE;
-        // gentle stick wiggles after the climb is established
-        if (t >= 3.0f) {
-            rc[0] = (uint16_t)(1500 + 100 * sin_approx(2.0f * M_PIf * 0.5f * t));
-            rc[1] = (uint16_t)(1500 + 80 * sin_approx(2.0f * M_PIf * 0.3f * t + 1.0f));
-            rc[3] = (uint16_t)(1500 + 60 * sin_approx(2.0f * M_PIf * 0.2f * t + 2.0f));
-        } else {
-            rc[0] = rc[1] = rc[3] = 1500;
-        }
+        for (unsigned k = 0; k < numInstances; k++) {
+            uint16_t *rc = insts[k].rc;
+            // a perturbed instance flies a slightly different roll profile;
+            // it must diverge while leaving the others bit-identical
+            const float rollAmp = insts[k].perturbed ? 130.0f : 100.0f;
 
-        controlStep();
+            // throttle ramps to just above hover over 2s, then holds
+            rc[2] = (t < 2.0f) ? (uint16_t)(1000 + (HOVER_THROTTLE - 1000) * 0.5f * t) : HOVER_THROTTLE;
+            // gentle stick wiggles after the climb is established
+            if (t >= 3.0f) {
+                rc[0] = (uint16_t)(1500 + rollAmp * sin_approx(2.0f * M_PIf * 0.5f * t));
+                rc[1] = (uint16_t)(1500 + 80 * sin_approx(2.0f * M_PIf * 0.3f * t + 1.0f));
+                rc[3] = (uint16_t)(1500 + 60 * sin_approx(2.0f * M_PIf * 0.2f * t + 2.0f));
+            } else {
+                rc[0] = rc[1] = rc[3] = 1500;
+            }
+
+            controlStep(k);
+        }
+        samples++;
 
         if (trace || (ms % 1000) == 0) {
             float m[4];
             double roll, pitch, yaw;
+            activate(0);
             bflGetMotorsPwm(m, 4);
-            quadSimEulerDeg(&sim, &roll, &pitch, &yaw);
-            printf("[trace] t=%5.2fs thr=%u alt=%6.2fm rpy=%6.1f %6.1f %6.1f rates=%6.1f %6.1f %6.1f motors= %7.2f %7.2f %7.2f %7.2f\n",
-                   (double)t, rc[2], quadSimAltitude(&sim), roll, pitch, yaw,
-                   sim.omega[0] * 180.0 / 3.14159265358979, sim.omega[1] * 180.0 / 3.14159265358979, sim.omega[2] * 180.0 / 3.14159265358979,
+            quadSimEulerDeg(&insts[0].sim, &roll, &pitch, &yaw);
+            printf("[trace] t=%5.2fs thr=%u alt=%6.2fm rpy=%6.1f %6.1f %6.1f motors= %7.2f %7.2f %7.2f %7.2f\n",
+                   (double)t, insts[0].rc[2], quadSimAltitude(&insts[0].sim), roll, pitch, yaw,
                    (double)m[0], (double)m[1], (double)m[2], (double)m[3]);
         }
     }
 
-    const bool stillArmed = ARMING_FLAG(ARMED);
-    const bool airborne = quadSimAltitude(&sim) > 1.0;
-    printf("[harness] done: t=%ums samples=%llu motorUpdates=%llu armed=%d alt=%.2fm airborne=%d\n",
-           (unsigned)(bflMicros() / 1000), (unsigned long long)samples,
-           (unsigned long long)bflGetMotorUpdateCount(), stillArmed,
-           quadSimAltitude(&sim), airborne);
-    printf("TRACE_HASH: %016llx\n", (unsigned long long)traceHash);
+    // Verdict
+    bool allArmedAirborne = true;
+    bool unperturbedIdentical = true;
+    uint64_t refHash = 0;
+    bool haveRef = false;
 
-    return (stillArmed && airborne) ? 0 : 3;
+    for (unsigned k = 0; k < numInstances; k++) {
+        activate(k);
+        const bool armed = bflIsArmed();
+        const bool airborne = quadSimAltitude(&insts[k].sim) > 1.0;
+        allArmedAirborne = allArmedAirborne && armed && airborne;
+
+        if (!insts[k].perturbed) {
+            if (!haveRef) {
+                refHash = insts[k].hash;
+                haveRef = true;
+            } else if (insts[k].hash != refHash) {
+                unperturbedIdentical = false;
+            }
+        }
+
+        printf("[harness] instance %u: armed=%d alt=%7.2fm hash=%016llx%s\n",
+               k, armed, quadSimAltitude(&insts[k].sim),
+               (unsigned long long)insts[k].hash,
+               insts[k].perturbed ? " (perturbed)" : "");
+    }
+
+    printf("[harness] done: t=%ums samples=%llu instances=%u identical=%d\n",
+           (unsigned)(bflMicros() / 1000), (unsigned long long)samples,
+           numInstances, unperturbedIdentical);
+    printf("TRACE_HASH: %016llx\n", (unsigned long long)refHash);
+
+    if (perturb != NO_PERTURB && perturb < numInstances && insts[perturb].hash == refHash) {
+        fprintf(stderr, "[harness] PERTURBED instance did not diverge\n");
+        return 4;
+    }
+    if (!unperturbedIdentical) {
+        fprintf(stderr, "[harness] HASH MISMATCH between unperturbed instances\n");
+        return 4;
+    }
+    return allArmedAirborne ? 0 : 3;
 }

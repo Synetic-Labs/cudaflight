@@ -13,16 +13,21 @@ INCLUDE_DIRS := \
         $(TARGET_PLATFORM_DIR)/include \
         $(LIB_MAIN_DIR)/dyad
 
+# sitl_lockstep_{main,physics,instance}.c are harness-side: the
+# multi-instance pipeline (tools/lockstep_instancer) compiles every other
+# TU to LLVM bitcode and rewrites firmware state accesses; these three
+# stay native and orchestrate the instances.
 MCU_COMMON_SRC  := \
-        $(LIB_MAIN_DIR)/dyad/dyad.c \
         SIMULATOR/sitl_lockstep.c \
+        SIMULATOR/sitl_lockstep_serial.c \
         SIMULATOR/sitl_lockstep_physics.c \
+        SIMULATOR/sitl_lockstep_instance.c \
         SIMULATOR/sitl_lockstep_main.c
 
 #Flags
 ARCH_FLAGS      =
 DEVICE_FLAGS    =
-LD_SCRIPT       = $(LINKER_DIR)/sitl.ld
+LD_SCRIPT       = $(LINKER_DIR)/sitl_lockstep.ld
 STARTUP_SRC     =
 
 MCU_FLASH_SIZE  := 2048
@@ -44,6 +49,9 @@ TARGET_MAP  = $(OBJECT_DIR)/$(FORKNAME)_$(TARGET).map
 
 LIBS        = -lm -lpthread -lc -lrt
 
+# --emit-relocs keeps static relocation records in the executable; the
+# multi-instance state manager reads them at startup to rebase pointers
+# inside each instance's copy of the mutable image.
 LD_FLAGS    := \
             $(LIBS) \
             $(ARCH_FLAGS) \
@@ -52,12 +60,27 @@ LD_FLAGS    := \
             -Wl,-gc-sections,-Map,$(TARGET_MAP) \
             -Wl,-L$(LINKER_DIR) \
             -Wl,--cref \
+            -Wl,--emit-relocs \
             -Wl,-z,noexecstack \
             -T$(LD_SCRIPT)
 
+# gcc-LTO is off: the multi-instance pipeline does its own whole-program
+# step at the LLVM IR level, and the flag set must be clang-compatible
+# (-Ofast is a hard error on clang >= 20; -ffast-math comes from
+# OPTIMISATION_BASE; -Wunsafe-loop-optimizations is gcc-only).
+LTO := no
+CFLAGS_DISABLED += -Wunsafe-loop-optimizations
+
+# clang warns (as error) about INFINITY under -ffast-math; the firmware's
+# explog_approx.c uses it deliberately as a saturation value, same as on
+# the gcc embedded targets.
+ifneq ($(findstring clang,$(CROSS_CC)),)
+DEVICE_FLAGS += -Wno-nan-infinity-disabled -Wno-parentheses-equality
+endif
+
 ifneq ($(DEBUG),GDB)
-OPTIMISE_DEFAULT    := -Ofast
-OPTIMISE_SPEED      := -Ofast
+OPTIMISE_DEFAULT    := -O3
+OPTIMISE_SPEED      := -O3
 OPTIMISE_SIZE       := -Os
 
 LTO_FLAGS           := $(OPTIMISATION_BASE) $(OPTIMISE_SPEED)

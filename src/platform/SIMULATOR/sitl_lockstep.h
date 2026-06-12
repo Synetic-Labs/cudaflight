@@ -54,6 +54,16 @@ void bflSetAttitudeQuat(float w, float x, float y, float z);
 // RC injection (1000..2000 us channel values, AETR order by default map).
 void bflSetRc(const uint16_t *channels, uint8_t channelCount);
 
+// Armed state of the active instance (safe for the native harness,
+// unlike reading armingFlags directly).
+bool bflIsArmed(void);
+
+// Map ARM to AUX1 high in the active instance's config.
+void bflConfigureArmSwitch(void);
+
+// Print the active instance's RC/arming/calibration state (debug aid).
+void bflDebugStatus(void);
+
 // Motor readback.
 uint16_t bflGetMotorCount(void);
 // Raw PWM values as written by the mixer (typically 1000..2000).
