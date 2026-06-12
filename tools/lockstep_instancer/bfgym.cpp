@@ -43,13 +43,17 @@ struct bfgym {
     CUdevice dev;
     CUcontext ctx;          // primary context, retained
     CUmodule mod;
-    CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep;
+    CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep, fFwStep;
+    CUfunction fOsd;
     uint32_t n;
     unsigned grid, block;
     uint64_t imageSize, stride, stateSize, actDim, obsDim;
+    uint64_t osdRows, osdCols;
     CUdeviceptr instBuf, stateBuf, snapBuf, snapStBuf;
     CUdeviceptr actBuf, obsBuf, rewBuf, doneBuf;
     CUdeviceptr hashBuf, altBuf, armedBuf;
+    CUdeviceptr sensBuf, motorBuf;  // external-physics exchange: [n x 7] in, [n x 4] out
+    CUdeviceptr osdBuf, osdAttrBuf; // OSD char grids: [n x rows*cols] u8 each
 };
 
 // The primary context may not be current on the calling thread (or torch
@@ -125,7 +129,8 @@ void bfgym_destroy(bfgym *g)
     cuCtxPushCurrent(g->ctx);
     for (CUdeviceptr p : { g->instBuf, g->stateBuf, g->snapBuf, g->snapStBuf,
                            g->actBuf, g->obsBuf, g->rewBuf, g->doneBuf,
-                           g->hashBuf, g->altBuf, g->armedBuf }) {
+                           g->hashBuf, g->altBuf, g->armedBuf,
+                           g->sensBuf, g->motorBuf, g->osdBuf, g->osdAttrBuf }) {
         if (p) {
             cuMemFree(p);
         }
@@ -142,8 +147,13 @@ void bfgym_destroy(bfgym *g)
 // Boot, settle and arm n instances, snapshot the armed state as the
 // episode start. settle_ms == 0 means the default 7000 (6s gyro
 // calibration + arming grace, 1s armed on the ground), matching the
-// validated harness schedule. Returns NULL on failure (see bfgym_error).
-bfgym *bfgym_create(const char *cubin_path, uint32_t n, int device, uint32_t settle_ms)
+// validated harness schedule. eeprom_path optionally names a boot-ready
+// config image (from the CPU harness's --cli-dump converter) preloaded
+// into every instance's RAM EEPROM before boot, so the fleet flies that
+// configuration instead of defaults. Returns NULL on failure (see
+// bfgym_error).
+bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint32_t settle_ms,
+                           const char *eeprom_path)
 {
     if (settle_ms == 0) {
         settle_ms = 7000;
@@ -178,6 +188,8 @@ bfgym *bfgym_create(const char *cubin_path, uint32_t n, int device, uint32_t set
     g->stateSize = readU64(g, "__bf_state_size", &err);
     g->actDim = readU64(g, "__bf_act_dim", &err);
     g->obsDim = readU64(g, "__bf_obs_dim", &err);
+    g->osdRows = readU64(g, "__bf_osd_rows", &err);
+    g->osdCols = readU64(g, "__bf_osd_cols", &err);
     if (err) {
         bfgym_destroy(g);
         return nullptr;
@@ -199,10 +211,18 @@ bfgym *bfgym_create(const char *cubin_path, uint32_t n, int device, uint32_t set
         cuOk(cuMemAlloc(&g->hashBuf, 8 * n), "alloc hashes") &&
         cuOk(cuMemAlloc(&g->altBuf, 4 * n), "alloc alt") &&
         cuOk(cuMemAlloc(&g->armedBuf, n), "alloc armed") &&
+        cuOk(cuMemAlloc(&g->sensBuf, 4 * 7 * n), "alloc sensors") &&
+        cuOk(cuMemAlloc(&g->motorBuf, 4 * 4 * n), "alloc motors") &&
+        cuOk(cuMemAlloc(&g->osdBuf, g->osdRows * g->osdCols * n), "alloc osd") &&
+        cuOk(cuMemAlloc(&g->osdAttrBuf, g->osdRows * g->osdCols * n), "alloc osd attrs") &&
+        cuOk(cuMemsetD8(g->osdBuf, 0x20, g->osdRows * g->osdCols * n), "blank osd") &&
+        cuOk(cuMemsetD8(g->osdAttrBuf, 0, g->osdRows * g->osdCols * n), "zero osd attrs") &&
         cuOk(cuMemsetD8(g->actBuf, 0, 4 * g->actDim * n), "zero actions") &&
         cuOk(cuMemsetD8(g->obsBuf, 0, 4 * g->obsDim * n), "zero obs") &&
         cuOk(cuMemsetD8(g->rewBuf, 0, 4 * n), "zero rewards") &&
-        cuOk(cuMemsetD8(g->doneBuf, 0, n), "zero dones");
+        cuOk(cuMemsetD8(g->doneBuf, 0, n), "zero dones") &&
+        cuOk(cuMemsetD8(g->sensBuf, 0, 4 * 7 * n), "zero sensors") &&
+        cuOk(cuMemsetD8(g->motorBuf, 0, 4 * 4 * n), "zero motors");
     if (!ok) {
         bfgym_destroy(g);
         return nullptr;
@@ -222,7 +242,9 @@ bfgym *bfgym_create(const char *cubin_path, uint32_t n, int device, uint32_t set
          cuOk(cuModuleGetFunction(&g->fFinish, g->mod, "bfFinish"), "bfFinish") &&
          cuOk(cuModuleGetFunction(&g->fSnapshot, g->mod, "bfSnapshot"), "bfSnapshot") &&
          cuOk(cuModuleGetFunction(&g->fReset, g->mod, "bfReset"), "bfReset") &&
-         cuOk(cuModuleGetFunction(&g->fStep, g->mod, "bfStep"), "bfStep");
+         cuOk(cuModuleGetFunction(&g->fStep, g->mod, "bfStep"), "bfStep") &&
+         cuOk(cuModuleGetFunction(&g->fFwStep, g->mod, "bfFwStep"), "bfFwStep") &&
+         cuOk(cuModuleGetFunction(&g->fOsd, g->mod, "bfOsdSnapshot"), "bfOsdSnapshot");
     if (!ok) {
         bfgym_destroy(g);
         return nullptr;
@@ -232,8 +254,50 @@ bfgym *bfgym_create(const char *cubin_path, uint32_t n, int device, uint32_t set
     void *initArgs[] = { &g->stateBuf, &perturb };
     void *bootArgs[] = { &g->stateBuf };
     void *snapArgs[] = { &g->stateBuf, &g->snapStBuf, &g->snapBuf };
-    if (launch(g, g->fInit, initArgs) ||
-        launch(g, g->fBoot, bootArgs) ||
+    if (launch(g, g->fInit, initArgs)) {
+        bfgym_destroy(g);
+        return nullptr;
+    }
+
+    if (eeprom_path) {
+        FILE *f = fopen(eeprom_path, "rb");
+        if (!f) {
+            snprintf(g_err, sizeof(g_err), "cannot open eeprom image '%s'", eeprom_path);
+            bfgym_destroy(g);
+            return nullptr;
+        }
+        fseek(f, 0, SEEK_END);
+        const uint64_t eeLen = (uint64_t)ftell(f);
+        rewind(f);
+        std::vector<uint8_t> ee(eeLen);
+        const bool readOk = fread(ee.data(), 1, eeLen, f) == eeLen;
+        fclose(f);
+        if (!readOk) {
+            snprintf(g_err, sizeof(g_err), "failed to read eeprom image '%s'", eeprom_path);
+            bfgym_destroy(g);
+            return nullptr;
+        }
+
+        CUfunction fLoadEeprom;
+        CUdeviceptr eeBuf = 0;
+        uint64_t len = eeLen;
+        uint32_t perInstance = 0;
+        void *eeArgs[] = { &eeBuf, &len, &perInstance };
+        const bool ok =
+            cuOk(cuModuleGetFunction(&fLoadEeprom, g->mod, "bfLoadEeprom"), "bfLoadEeprom") &&
+            cuOk(cuMemAlloc(&eeBuf, eeLen), "alloc eeprom") &&
+            cuOk(cuMemcpyHtoD(eeBuf, ee.data(), eeLen), "upload eeprom") &&
+            launch(g, fLoadEeprom, eeArgs) == 0;
+        if (eeBuf) {
+            cuMemFree(eeBuf);
+        }
+        if (!ok) {
+            bfgym_destroy(g);
+            return nullptr;
+        }
+    }
+
+    if (launch(g, g->fBoot, bootArgs) ||
         runMs(g, settle_ms)) {
         bfgym_destroy(g);
         return nullptr;
@@ -261,6 +325,12 @@ bfgym *bfgym_create(const char *cubin_path, uint32_t n, int device, uint32_t set
         return nullptr;
     }
     return g;
+}
+
+// Default-config create, kept for ABI compatibility.
+bfgym *bfgym_create(const char *cubin_path, uint32_t n, int device, uint32_t settle_ms)
+{
+    return bfgym_create_eeprom(cubin_path, n, device, settle_ms, nullptr);
 }
 
 uint32_t bfgym_num_envs(bfgym *g) { return g->n; }
@@ -342,6 +412,67 @@ int bfgym_sync(bfgym *g)
     CtxGuard guard(g->ctx);
     CUTRY(cuCtxSynchronize());
     return 0;
+}
+
+// ---------------------------------------------------------------------------
+// External-physics mode: the firmware advances against sensor values from an
+// outside simulator, which in turn consumes the firmware's motor outputs.
+// Per 1ms control step: write sensors -> bfgym_fw_step(1) -> read motors.
+// The in-kernel physics is bypassed (its state goes stale); obs/reward/done
+// are the external simulator's business.
+
+// Device pointers for the exchange buffers.
+uint64_t bfgym_sensors_ptr(bfgym *g) { return (uint64_t)g->sensBuf; }
+uint64_t bfgym_motors_ptr(bfgym *g) { return (uint64_t)g->motorBuf; }
+uint64_t bfgym_armed_ptr(bfgym *g) { return (uint64_t)g->armedBuf; }
+
+// Copy sensors (float32 [n, 7]: gyro NED rad/s, specific force NED m/s^2,
+// baro Pa) from another device buffer. Caller must ensure the source is
+// fully written before calling.
+int bfgym_write_sensors(bfgym *g, uint64_t src_devptr)
+{
+    CtxGuard guard(g->ctx);
+    CUTRY(cuMemcpyDtoD(g->sensBuf, (CUdeviceptr)src_devptr, 4 * 7 * g->n));
+    CUTRY(cuCtxSynchronize()); // source may be freed/reused once we return
+    return 0;
+}
+
+// Host fallback for the same.
+int bfgym_write_sensors_host(bfgym *g, const float *src)
+{
+    CtxGuard guard(g->ctx);
+    CUTRY(cuMemcpyHtoD(g->sensBuf, src, 4 * 7 * g->n));
+    return 0;
+}
+
+// Advance the firmware `substeps` 1ms control steps against the current
+// sensors and actions buffers; writes normalised motor outputs [n, 4] and
+// the armed flags [n].
+int bfgym_fw_step(bfgym *g, uint32_t substeps)
+{
+    CtxGuard guard(g->ctx);
+    void *args[] = { &g->stateBuf, &g->actBuf, &g->sensBuf, &g->motorBuf,
+                     &g->armedBuf, &substeps };
+    return launch(g, g->fFwStep, args);
+}
+
+// ---------------------------------------------------------------------------
+// OSD readback. The firmware draws its OSD into per-instance character
+// grids as part of normal stepping; bfgym_osd_update() snapshots every
+// instance's grid (and displayport attributes: severity bits + blink in
+// bit 7) into the exported [n, rows*cols] uint8 device buffers, which a
+// renderer maps as zero-copy tensors.
+
+uint32_t bfgym_osd_rows(bfgym *g) { return (uint32_t)g->osdRows; }
+uint32_t bfgym_osd_cols(bfgym *g) { return (uint32_t)g->osdCols; }
+uint64_t bfgym_osd_ptr(bfgym *g) { return (uint64_t)g->osdBuf; }
+uint64_t bfgym_osd_attrs_ptr(bfgym *g) { return (uint64_t)g->osdAttrBuf; }
+
+int bfgym_osd_update(bfgym *g)
+{
+    CtxGuard guard(g->ctx);
+    void *args[] = { &g->osdBuf, &g->osdAttrBuf };
+    return launch(g, g->fOsd, args);
 }
 
 // Motor-trace hashes (host out, n entries) — the determinism oracle.

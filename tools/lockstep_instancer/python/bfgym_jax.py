@@ -120,7 +120,7 @@ class _DevicePointer:
 
 class BetaflightJaxEnv:
     def __init__(self, num_envs, cubin=None, lib=None, decimation=10,
-                 device_index=0, settle_ms=0, auto_reset=True):
+                 device_index=0, settle_ms=0, auto_reset=True, eeprom=None):
         self.decimation = decimation
         self.auto_reset = auto_reset
         self.device = jax.devices("gpu")[device_index]
@@ -129,7 +129,11 @@ class BetaflightJaxEnv:
 
         self._lib = _load(lib)
         cubin = str(cubin or _DEFAULT_OUT / "fw.cubin")
-        self._h = self._lib.bfgym_create(cubin.encode(), num_envs, device_index, settle_ms)
+        # eeprom: boot-ready config image from the CPU --cli-dump converter
+        # (e.g. a real quad's CLI dump); None boots defaults
+        self._h = self._lib.bfgym_create_eeprom(
+            cubin.encode(), num_envs, device_index, settle_ms,
+            str(eeprom).encode() if eeprom else None)
         if not self._h:
             raise RuntimeError(f"bfgym_create failed: {self._lib.bfgym_error().decode()}")
 

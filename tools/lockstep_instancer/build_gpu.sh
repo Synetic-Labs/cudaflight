@@ -100,11 +100,11 @@ llvm-link "$OUT/fw_gpu_inst.bc" \
     -o "$OUT/whole.bc"
 
 echo "== internalize + DCE + codegen"
-KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build"
+KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfLoadEeprom,bfOsdSnapshot,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build"
 opt -passes='internalize,globaldce' -internalize-public-api-list="$KEEP" \
     "$OUT/whole.bc" -o "$OUT/whole_dce.bc"
 clang -target nvptx64-nvidia-cuda -march=$GPUARCH -O3 -x ir "$OUT/whole_dce.bc" -S -o "$OUT/fw.ptx"
-ptxas -arch=$GPUARCH -O3 "$OUT/fw.ptx" -o "$OUT/fw.cubin"
+ptxas -arch=$GPUARCH -O3 --split-compile=0 "$OUT/fw.ptx" -o "$OUT/fw.cubin"
 echo "   $(grep -c '^\.visible \.entry\|^.visible .entry' "$OUT/fw.ptx" || true) kernels, $(wc -c < "$OUT/fw.cubin") B cubin"
 
 echo "== host runner + bfgym shared lib"

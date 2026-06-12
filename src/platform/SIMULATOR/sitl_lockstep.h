@@ -82,3 +82,31 @@ void bflSetEepromPath(const char *path);
 // host-side preloading in RAM-only mode.
 uint8_t *bflEepromBuffer(void);
 uint32_t bflEepromSize(void);
+
+// Execute CLI commands against the active instance through the real CLI
+// parser (the code path a configurator paste takes); output is captured
+// and printed with a [cli] prefix. The text must not contain reboot-class
+// commands ('save' without noreboot, 'exit', plain 'defaults', 'bl',
+// 'msc') — systemReset() exits the process on this target. Use the
+// harness-side dump loader for raw configurator/manufacturer dumps.
+void bflCliExec(const char *text, uint32_t len);
+
+// mixerConfig()->yaw_motors_reversed of the active instance, for the
+// physics model's reaction torque signs.
+bool bflYawMotorsReversed(void);
+
+// OSD character grid of the active instance (sitl_lockstep_osd.c):
+// rows*cols MAX7456-style font indices, row-major, 0x20 = blank, plus a
+// parallel displayport-attribute grid (severity bits, DISPLAYPORT_BLINK
+// in bit 7). Live firmware state — copy out before stepping again if a
+// stable frame is needed.
+const uint8_t *bflOsdScreen(void);
+const uint8_t *bflOsdAttrs(void);
+unsigned bflOsdRows(void);
+unsigned bflOsdCols(void);
+// Completed OSD draw cycles since boot (0 = OSD never ran).
+uint32_t bflOsdDrawCount(void);
+// Set the craft name (OSD_CRAFT_NAME) unless the config already has one.
+void bflOsdDefaultCraftName(const char *name);
+// Enable a classic FPV element layout if the config enables no elements.
+void bflOsdApplyDemoLayoutIfBlank(void);

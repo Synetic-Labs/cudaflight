@@ -1,0 +1,164 @@
+# BetaFPV Air75 (0802SE 23000KV, GF 40mm, 1S 450mAh) — sim-adapted CLI dump.
+#
+# Source: air75_betafpv_4.5.0_0520.txt (Betaflight 4.5.0 / STM32G47X /
+# BETAFPVG473, commit c155f5830), translated for the SITL_LOCKSTEP master
+# build. Convert to a boot-ready EEPROM image with:
+#
+#   obj/multi/betaflight_SITL_LOCKSTEP_MULTI \
+#       --cli-dump tools/lockstep_instancer/configs/air75/air75_sim.txt \
+#       --eeprom obj/configs/air75.bin
+#
+# Translations from the vendor 4.5.0 dump (verify against the converter's
+# "diff all" output):
+#   dshot_idle_value 600        -> motor_idle 600 (master unified idle,
+#                                  same percent*100 units)
+#   d_min_roll 37 / d_min_pitch 43
+#                               -> d_roll 37 / d_pitch 43 (4.6 D/Dmax
+#                                  rework renamed d_min -> d; the old D
+#                                  became d_max, left at its default
+#                                  40/46 which equals the 4.5.0 default D
+#                                  the quad flies with)
+#   simplified_dmax_gain 20     -> simplified_d_max_gain 20
+#
+# Dropped, with reasons:
+#   vtx_*, vtxtable, beacon     - no VTX/beeper hardware in the sim; not
+#       compiled into SITL, flight-neutral. The OSD block IS kept: the
+#       lockstep target renders the real OSD into a per-instance
+#       character grid (sitl_lockstep_osd.c)
+#   motor_pwm_protocol DSHOT300 - the ESC wire format; SITL has no DSHOT
+#       transport (motors are direct normalised writes) and the setting
+#       trips the MOTOR_PROTO arming block. Flight-neutral here: the idle
+#       floor it implies is carried by motor_idle, which master applies
+#       for every protocol
+#   dshot_bidir, dshot_bitbang  - no DSHOT telemetry transport in the sim.
+#       KNOWN GAP: on the real quad dshot_bidir enables the RPM filter
+#       (3 harmonic notches tracking motor eRPM); the sim currently flies
+#       without it, so the sim gyro sees less filtering delay than the
+#       real quad. Revisit when motor RPM feedback is wired into the sim.
+#   acc_calibration             - raw-sensor offsets measured on one
+#       physical board; the sim's virtual accelerometer is already
+#       perfect, applying them would inject an attitude bias the real
+#       (calibrated) quad does not have
+#   osd_rssi_dbm_alarm/_pos     - RSSI dBm needs an RX-link protocol the
+#       sim does not model
+#   vcd_video_system AUTO       - MAX7456-only setting; the sim OSD grid
+#       is fixed 30x16 PAL
+#   debug_mode GYRO_SCALED      - debug output selector, flight-neutral;
+#       value no longer exists on master
+#   mcu_id / signature          - board identity of the donor quad
+#
+# Everything else is verbatim from the vendor dump.
+
+# version
+# Betaflight / STM32G47X (SG47) 4.5.0 May 16 2024 / 01:17:04 (c155f5830) MSP API: 1.46
+# config rev: 93dfc69
+
+defaults nosave
+
+board_name BETAFPVG473
+manufacturer_id BEFH
+
+# name: AIR75
+
+# feature
+feature OSD
+
+# aux
+aux 0 0 0 1700 2100 0 0
+aux 1 1 1 900 1300 0 0
+aux 2 2 1 1300 1700 0 0
+aux 3 13 3 1700 2100 0 0
+aux 4 35 2 1700 2100 0 0
+
+# master
+set gyro_lpf1_static_hz = 0
+set dyn_notch_count = 1
+set dyn_notch_q = 350
+set dyn_notch_min_hz = 150
+set dyn_notch_max_hz = 350
+set gyro_lpf1_dyn_min_hz = 0
+set baro_hardware = NONE
+set motor_idle = 600
+set motor_poles = 12
+set vbat_max_cell_voltage = 440
+set vbat_warning_cell_voltage = 345
+set ibata_offset = -600
+set yaw_motors_reversed = ON
+set small_angle = 180
+set pid_process_denom = 2
+set osd_vbat_pos = 2369
+set osd_rssi_pos = 226
+set osd_link_quality_pos = 2337
+set osd_tim_1_pos = 386
+set osd_tim_2_pos = 2454
+set osd_remaining_time_estimate_pos = 33
+set osd_flymode_pos = 2422
+set osd_throttle_pos = 2390
+set osd_crosshairs_pos = 2253
+set osd_current_pos = 2400
+set osd_mah_drawn_pos = 2434
+set osd_craft_name_pos = 2443
+set osd_home_dist_pos = 98
+set osd_flight_dist_pos = 130
+set osd_warnings_pos = 2378
+set osd_avg_cell_voltage_pos = 44
+set osd_pit_ang_pos = 97
+set osd_rol_ang_pos = 65
+set osd_disarmed_pos = 267
+set osd_core_temp_pos = 278
+set osd_displayport_device = AUTO
+set craft_name = AIR75
+
+profile 0
+
+# profile 0
+set profile_name = GF 40mm
+set throttle_boost = 0
+set p_pitch = 64
+set i_pitch = 115
+set f_pitch = 82
+set p_roll = 61
+set i_roll = 110
+set f_roll = 79
+set p_yaw = 61
+set i_yaw = 110
+set f_yaw = 79
+set d_roll = 37
+set d_pitch = 43
+set d_max_roll = 40
+set d_max_pitch = 46
+set auto_profile_cell_count = 1
+set feedforward_averaging = 2_POINT
+set simplified_master_multiplier = 110
+set simplified_d_gain = 115
+set simplified_pi_gain = 125
+set simplified_d_max_gain = 20
+set simplified_feedforward_gain = 60
+set tpa_rate = 75
+set tpa_breakpoint = 1250
+
+profile 1
+
+profile 2
+
+profile 3
+
+# restore original profile selection
+profile 0
+
+rateprofile 0
+
+# rateprofile 0
+set thr_mid = 65
+set thr_expo = 35
+
+rateprofile 1
+
+rateprofile 2
+
+rateprofile 3
+
+# restore original rateprofile selection
+rateprofile 0
+
+save

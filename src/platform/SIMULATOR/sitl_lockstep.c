@@ -55,11 +55,15 @@
 #include "drivers/barometer/barometer_virtual.h"
 #include "flight/imu.h"
 
+#include "cli/cli.h"
+
 #include "config/feature.h"
 #include "config/config.h"
 #include "config/config_streamer.h"
 #include "config/config_streamer_impl.h"
 #include "config/config_eeprom_impl.h"
+
+#include "flight/mixer.h"
 
 #include "scheduler/scheduler.h"
 
@@ -457,6 +461,144 @@ void bflGetMotorsNormalised(float *out, unsigned maxCount)
 uint64_t bflGetMotorUpdateCount(void)
 {
     return motorUpdateCount;
+}
+
+// Yaw reaction-torque direction for the physics model. With
+// yaw_motors_reversed the firmware negates its yaw mixer column because
+// the props physically spin opposite to the default direction — the
+// physics model must flip its reaction torque signs to match the real
+// airframe. Firmware-side so the PG accessor is not inlined into the
+// native harness.
+bool bflYawMotorsReversed(void)
+{
+    return mixerConfig()->yaw_motors_reversed;
+}
+
+// ===========================================================================
+// CLI text execution. Feeds a block of CLI commands (e.g. a manufacturer
+// CLI dump) through the real CLI parser against the active instance, so
+// loading a config exercises the exact code path a configurator paste
+// does. The caller must sanitise reboot-class commands first ('save',
+// 'exit', 'defaults' without nosave, 'bl', 'msc'): on this target
+// systemReset() exits the process. See bflLoadCliDump() in the harness.
+// ===========================================================================
+
+static const char *cliFeedBuf;      // text being fed (caller-owned)
+static uint32_t cliFeedLen;
+static uint32_t cliFeedPos;
+static char cliCapBuf[256];         // CLI output captured into lines
+static unsigned cliCapLen;
+
+static void cliCapFlush(void)
+{
+    if (cliCapLen) {
+        cliCapBuf[cliCapLen] = '\0';
+        printf("[cli] %s\n", cliCapBuf);
+        cliCapLen = 0;
+    }
+}
+
+static void cliFeedWrite(serialPort_t *instance, uint8_t ch)
+{
+    UNUSED(instance);
+    if (ch == '\n') {
+        cliCapFlush();
+    } else if (ch >= 0x20 && ch < 0x7f && cliCapLen < sizeof(cliCapBuf) - 1) {
+        cliCapBuf[cliCapLen++] = ch;
+    }
+}
+
+static void cliFeedWriteBuf(serialPort_t *instance, const void *data, int count)
+{
+    const uint8_t *p = data;
+    for (int i = 0; i < count; i++) {
+        cliFeedWrite(instance, p[i]);
+    }
+}
+
+static uint32_t cliFeedRxWaiting(const serialPort_t *instance)
+{
+    UNUSED(instance);
+    return cliFeedLen - cliFeedPos;
+}
+
+static uint8_t cliFeedRead(serialPort_t *instance)
+{
+    UNUSED(instance);
+    return cliFeedPos < cliFeedLen ? (uint8_t)cliFeedBuf[cliFeedPos++] : 0;
+}
+
+static uint32_t cliFeedTxFree(const serialPort_t *instance)
+{
+    UNUSED(instance);
+    return UINT32_MAX;
+}
+
+static bool cliFeedTxBufferEmpty(const serialPort_t *instance)
+{
+    UNUSED(instance);
+    return true;
+}
+
+static void cliFeedSetBaudRate(serialPort_t *instance, uint32_t baudRate)
+{
+    instance->baudRate = baudRate;
+}
+
+static void cliFeedSetMode(serialPort_t *instance, portMode_e mode)
+{
+    instance->mode = mode;
+}
+
+static void cliFeedNoopWrite(serialPort_t *instance)
+{
+    UNUSED(instance);
+}
+
+static const struct serialPortVTable cliFeedVTable = {
+    .serialWrite = cliFeedWrite,
+    .serialTotalRxWaiting = cliFeedRxWaiting,
+    .serialTotalTxFree = cliFeedTxFree,
+    .serialRead = cliFeedRead,
+    .serialSetBaudRate = cliFeedSetBaudRate,
+    .isSerialTransmitBufferEmpty = cliFeedTxBufferEmpty,
+    .setMode = cliFeedSetMode,
+    .setCtrlLineStateCb = NULL,
+    .setBaudRateCb = NULL,
+    .writeBuf = cliFeedWriteBuf,
+    .beginWrite = cliFeedNoopWrite,
+    .endWrite = cliFeedNoopWrite,
+};
+
+static serialPort_t cliFeedPort;
+
+static void cliFeedRun(const char *text, uint32_t len)
+{
+    cliFeedBuf = text;
+    cliFeedLen = len;
+    cliFeedPos = 0;
+    // cliProcess drains every waiting byte per call; the loop guards
+    // against the non-interactive 2s (virtual) inactivity exit re-arming
+    // mid-feed after a command that advances the clock.
+    while (cliFeedPos < cliFeedLen) {
+        if (!cliProcess()) {
+            cliEnter(&cliFeedPort, false);
+        }
+    }
+}
+
+void bflCliExec(const char *text, uint32_t len)
+{
+    memset(&cliFeedPort, 0, sizeof(cliFeedPort));
+    cliFeedPort.vTable = &cliFeedVTable;
+
+    cliEnter(&cliFeedPort, false);
+    cliFeedRun(text, len);
+    // ETX makes the non-interactive CLI exit cleanly (no reboot, and the
+    // non-interactive path never set ARMING_DISABLED_CLI)
+    static const char etx = 0x03;
+    cliFeedRun(&etx, 1);
+    cliCapFlush();
 }
 
 // ===========================================================================

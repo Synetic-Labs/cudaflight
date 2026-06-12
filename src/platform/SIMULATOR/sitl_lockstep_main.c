@@ -79,6 +79,100 @@ static uint64_t fnv1a64(uint64_t hash, const void *data, size_t len)
     return hash;
 }
 
+// --- CLI dump loading -------------------------------------------------------
+// Turns a configurator/manufacturer CLI dump ("diff all" text) into EEPROM
+// contents: sanitise reboot-class commands out of the text, feed it through
+// the real CLI parser, then save without rebooting. The eeprom file written
+// via --eeprom is then a boot-ready config for any backend (CPU file mode,
+// GPU RAM preload).
+
+static bool lineFirstTokenIs(const char *line, const char *token)
+{
+    while (*line == ' ' || *line == '\t') {
+        line++;
+    }
+    const size_t n = strlen(token);
+    if (strncasecmp(line, token, n) != 0) {
+        return false;
+    }
+    const char c = line[n];
+    return c == '\0' || c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '#';
+}
+
+static char *sanitizeCliDump(const char *text, size_t len, size_t *outLen)
+{
+    // worst case: every line is "defaults" gaining " nosave"
+    char *out = malloc(len + len / 2 + 64);
+    size_t o = 0;
+
+    const char *p = text;
+    const char *end = text + len;
+    while (p < end) {
+        const char *nl = memchr(p, '\n', end - p);
+        const size_t lineLen = nl ? (size_t)(nl - p) + 1 : (size_t)(end - p);
+        char line[512];
+        const size_t n = lineLen < sizeof(line) - 1 ? lineLen : sizeof(line) - 1;
+        memcpy(line, p, n);
+        line[n] = '\0';
+        p += lineLen;
+
+        // reboot-class / batch commands are the harness's business, not
+        // the dump's: 'save' and 'exit' reboot (exit(0) on this target);
+        // 'batch' would turn any unknown-setting error into a refused
+        // save; 'defaults' without nosave reboots too
+        if (lineFirstTokenIs(line, "save") || lineFirstTokenIs(line, "exit") ||
+            lineFirstTokenIs(line, "batch") || lineFirstTokenIs(line, "bl") ||
+            lineFirstTokenIs(line, "msc")) {
+            continue;
+        }
+        if (lineFirstTokenIs(line, "defaults") && strcasestr(line, "nosave") == NULL) {
+            o += sprintf(out + o, "defaults nosave\n");
+            continue;
+        }
+        memcpy(out + o, line, n);
+        o += n;
+    }
+    o += sprintf(out + o, "\nsave noreboot\n");
+    out[o] = '\0';
+    *outLen = o;
+    return out;
+}
+
+static int runCliDumpConverter(const char *dumpPath)
+{
+    FILE *f = fopen(dumpPath, "r");
+    if (!f) {
+        fprintf(stderr, "[harness] cannot open CLI dump '%s'\n", dumpPath);
+        return 1;
+    }
+    fseek(f, 0, SEEK_END);
+    const long size = ftell(f);
+    rewind(f);
+    char *text = malloc(size + 1);
+    if (fread(text, 1, size, f) != (size_t)size) {
+        fprintf(stderr, "[harness] failed to read '%s'\n", dumpPath);
+        return 1;
+    }
+    fclose(f);
+    text[size] = '\0';
+
+    size_t cliLen;
+    char *cli = sanitizeCliDump(text, size, &cliLen);
+    free(text);
+
+    printf("[harness] applying CLI dump '%s' (%ld bytes)\n", dumpPath, size);
+    bflCliExec(cli, (uint32_t)cliLen);
+    free(cli);
+
+    // show what the firmware actually accepted — this output is the
+    // verification artifact, compare it against the source dump
+    printf("[harness] resulting configuration (diff all):\n");
+    const char diffCmd[] = "diff all\n";
+    bflCliExec(diffCmd, sizeof(diffCmd) - 1);
+
+    return 0;
+}
+
 static void activate(unsigned k)
 {
     if (numInstances > 1) {
@@ -98,6 +192,28 @@ static void controlStep(unsigned k)
     float motors[4];
     bflGetMotorsPwm(motors, 4);
     insts[k].hash = fnv1a64(insts[k].hash, motors, sizeof(motors));
+}
+
+// ASCII view of an instance's OSD character grid. Letters/digits/punctuation
+// sit at their ASCII codepoints in Betaflight fonts so text reads directly;
+// symbol glyphs (horizon line, battery icon, ...) print as '.'.
+static void dumpOsd(unsigned k, const char *when)
+{
+    activate(k);
+    const unsigned rows = bflOsdRows(), cols = bflOsdCols();
+    const uint8_t *s = bflOsdScreen();
+    printf("[osd] instance %u %s (draws=%u)\n", k, when, (unsigned)bflOsdDrawCount());
+    printf("      +%.*s+\n", cols, "------------------------------------------------");
+    for (unsigned y = 0; y < rows; y++) {
+        char line[64];
+        for (unsigned x = 0; x < cols; x++) {
+            const uint8_t c = s[y * cols + x];
+            line[x] = (c >= 0x20 && c < 0x7f) ? (char)c : '.';
+        }
+        line[cols] = '\0';
+        printf("      |%s|\n", line);
+    }
+    printf("      +%.*s+\n", cols, "------------------------------------------------");
 }
 
 static void printArmingDisableFlags(void)
@@ -120,7 +236,9 @@ int main(int argc, char *argv[])
 {
     int flySeconds = DEFAULT_FLY_SECONDS;
     bool trace = false;
+    bool osdDump = false;
     const char *eepromBase = NULL;
+    const char *cliDumpPath = NULL;
     unsigned perturb = NO_PERTURB;
 
     for (int i = 1; i < argc; i++) {
@@ -128,18 +246,28 @@ int main(int argc, char *argv[])
             flySeconds = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--eeprom") == 0 && i + 1 < argc) {
             eepromBase = argv[++i];
+        } else if (strcmp(argv[i], "--cli-dump") == 0 && i + 1 < argc) {
+            cliDumpPath = argv[++i];
         } else if (strcmp(argv[i], "--instances") == 0 && i + 1 < argc) {
             numInstances = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--perturb") == 0 && i + 1 < argc) {
             perturb = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--trace") == 0) {
             trace = true;
+        } else if (strcmp(argv[i], "--osd") == 0) {
+            osdDump = true;
         } else {
             fprintf(stderr,
-                    "usage: %s [--seconds N] [--eeprom FILE] [--instances N] [--perturb K] [--trace]\n",
-                    argv[0]);
+                    "usage: %s [--seconds N] [--eeprom FILE] [--instances N] [--perturb K] [--trace] [--osd]\n"
+                    "       %s --cli-dump DUMP.txt --eeprom OUT.bin   (convert CLI dump to eeprom image)\n",
+                    argv[0], argv[0]);
             return 1;
         }
+    }
+
+    if (cliDumpPath) {
+        // converter mode: boot one instance, apply the dump, save, exit
+        numInstances = 1;
     }
 
     setvbuf(stdout, NULL, _IOLBF, 0);
@@ -177,9 +305,27 @@ int main(int argc, char *argv[])
         initPhase2();
         initPhase3();
 
+        if (cliDumpPath) {
+            // before bflConfigureArmSwitch so the saved EEPROM is purely
+            // the dump's configuration
+            const int rc = runCliDumpConverter(cliDumpPath);
+            if (rc == 0) {
+                printf("[harness] eeprom written to '%s' (%u bytes)\n",
+                       eepromBase ? eepromBase : EEPROM_FILENAME, bflEepromSize());
+            }
+            return rc;
+        }
+
         // Map ARM to AUX1 high (firmware-side helper: PG accessors are
         // static-inline and must not be inlined into this native file)
         bflConfigureArmSwitch();
+
+        // OSD: with a layout-less config, enable the demo elements and
+        // tag each instance by name so a wall of instances is tellable apart
+        bflOsdApplyDemoLayoutIfBlank();
+        char craftName[26];
+        sprintf(craftName, "BETAFLIGHT %04u", k % 10000);
+        bflOsdDefaultCraftName(craftName);
 
         // RC defaults: sticks centred, throttle low, all aux low (AETR map)
         for (int i = 0; i < BFL_MAX_RC_CHANNELS; i++) {
@@ -203,6 +349,11 @@ int main(int argc, char *argv[])
             controlStep(k);
         }
         samples++;
+        if (osdDump && (ms == 1000 || ms == 5000)) {
+            char when[32];
+            sprintf(when, "settle t=%ds", ms / 1000);
+            dumpOsd(0, when); // 1s: boot logo; 5s: live grid, disarmed
+        }
     }
 
     // Arm
@@ -265,6 +416,13 @@ int main(int argc, char *argv[])
             printf("[trace] t=%5.2fs thr=%u alt=%6.2fm rpy=%6.1f %6.1f %6.1f motors= %7.2f %7.2f %7.2f %7.2f\n",
                    (double)t, insts[0].rc[2], quadSimAltitude(&insts[0].sim), roll, pitch, yaw,
                    (double)m[0], (double)m[1], (double)m[2], (double)m[3]);
+        }
+    }
+
+    if (osdDump) {
+        dumpOsd(0, "end of flight");
+        if (perturb != NO_PERTURB && perturb < numInstances) {
+            dumpOsd(perturb, "end of flight (perturbed)");
         }
     }
 

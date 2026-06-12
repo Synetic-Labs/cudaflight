@@ -38,3 +38,26 @@
 // the lockstep build closes the loop through real sensors instead, so
 // the firmware must run its own attitude estimation as on hardware.
 #define USE_IMU_CALC
+
+// Real quads fly with the dynamic notch on (whoop configs typically run
+// dyn_notch_count >= 1); simulator targets historically dropped it over
+// a long-gone arm_math.h dependency (see common_post.h), but for
+// sim-to-real the gyro filter chain must match hardware. Pure float
+// SDFT, deterministic, GPU-safe.
+#define USE_DYN_NOTCH_FILTER
+#define SIMULATOR_DYN_NOTCH
+
+// OSD, rendered by the firmware into a per-instance character grid via
+// the framebuffer-OSD displayport (io/displayport_fb_osd.c); the
+// fb_osd_impl backend is sitl_lockstep_osd.c. SD only: with USE_OSD_HD
+// the config defaults route the displayport to MSP (not built here) and
+// OSD silently disables itself. AUTO device selection in init.c then
+// falls through to FBOSD.
+#define USE_OSD
+#undef USE_OSD_HD
+#define ENABLE_FB_OSD 1
+
+// Stock SITL defaults plus OSD so the OSD task runs out of the box;
+// real-quad CLI dumps agree ('feature OSD').
+#undef DEFAULT_FEATURES
+#define DEFAULT_FEATURES (FEATURE_GPS | FEATURE_TELEMETRY | FEATURE_OSD)

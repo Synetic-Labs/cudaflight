@@ -71,6 +71,10 @@ void quadSimInit(quadSim_t *sim)
     sim->q[0] = 1.0;
     sim->onGround = true;
     sim->accBody[2] = -GRAVITY_MSS;
+    // must be called after firmware init: with yaw_motors_reversed the
+    // real airframe's props spin opposite to default and the firmware
+    // negates its yaw mixer column, so the reaction torques flip too
+    sim->yawDir = bflYawMotorsReversed() ? -1.0 : 1.0;
 }
 
 void quadSimStep(quadSim_t *sim, double dt)
@@ -104,7 +108,7 @@ void quadSimStep(quadSim_t *sim, double dt)
     for (int i = 0; i < 4; i++) {
         tau[0] += -motorY[i] * sim->thrust[i];
         tau[1] += motorX[i] * sim->thrust[i];
-        tau[2] += yawSign[i] * TORQUE_PER_N * sim->thrust[i];
+        tau[2] += sim->yawDir * yawSign[i] * TORQUE_PER_N * sim->thrust[i];
     }
 
     // angular damping and gyroscopic term

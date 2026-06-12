@@ -115,6 +115,28 @@ KERNEL void bfInstanceInit(bfFlight_t *st, uint32_t perturbIdx)
     s->perturbed = (k == perturbIdx);
 }
 
+// Preload the per-instance EEPROM (RAM-backed on GPU) with a boot-ready
+// config image, e.g. one produced from a CLI dump by the CPU harness's
+// --cli-dump converter. Must run after bfInstanceInit (which resets the
+// blob) and before bfBoot (which reads the config from it) — the firmware
+// then boots from this config exactly as hardware boots from flash.
+// src holds one image broadcast to all instances (perInstance == 0) or N
+// consecutive images len bytes apart (perInstance != 0, for per-instance
+// config randomization).
+KERNEL void bfLoadEeprom(const uint8_t *src, uint64_t len, uint32_t perInstance)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    uint8_t *ee = bflEepromBuffer();
+    const uint32_t cap = bflEepromSize();
+    if (len > cap) {
+        len = cap;
+    }
+    memcpy(ee, src + (perInstance ? (uint64_t)k * len : 0), len);
+}
+
 // Boot the instance through the real firmware init path.
 KERNEL void bfBoot(bfFlight_t *st)
 {
@@ -132,6 +154,16 @@ KERNEL void bfBoot(bfFlight_t *st)
 
     // Map ARM to AUX1 high (firmware-side helper, see header note)
     bflConfigureArmSwitch();
+
+    // OSD: demo element layout for layout-less configs, and a per-instance
+    // craft name so wall tiles are tellable apart (config names win)
+    bflOsdApplyDemoLayoutIfBlank();
+    char craftName[16] = "BETAFLIGHT 0000";
+    unsigned id = k % 10000;
+    for (int i = 14; i >= 11; i--, id /= 10) {
+        craftName[i] = (char)('0' + id % 10);
+    }
+    bflOsdDefaultCraftName(craftName);
 
     // RC defaults: sticks centred, throttle low, all aux low (AETR map)
     for (int i = 0; i < BFL_MAX_RC_CHANNELS; i++) {
@@ -285,6 +317,73 @@ KERNEL void bfStep(bfFlight_t *st, const float *actions, float *obs,
     }
     rewards[k] = r;
     dones[k] = done ? 1 : 0;
+}
+
+// External-physics step: advance the firmware ONLY, against sensor values
+// computed by an outside simulator (e.g. a JAX physics model living in the
+// same CUDA context). The in-kernel quadSim is bypassed; the host loop runs
+//
+//   bfFwStep(sensors -> firmware 1ms -> motors)  |  external physics
+//
+// once per control step. Boot/settle/arm still use the in-kernel physics
+// (ground sensors are identical), and the motor hash keeps accumulating, so
+// the determinism oracle covers this path too.
+//
+// actions: [N x 4] in [-1,1], AETR -> RC, same stick mapping as bfStep.
+// sensors: [N x 7]: body rates rad/s NED (3), specific force m/s^2 NED
+//          body (3), baro pressure Pa (1).
+// motors:  [N x 4] normalised [0,1] outputs for the external model.
+KERNEL void bfFwStep(bfFlight_t *st, const float *actions, const float *sensors,
+                     float *motors, uint8_t *armed, uint32_t substeps)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    bfFlight_t *s = &st[k];
+
+    const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
+    s->rc[0] = (uint16_t)(1500.0f + 500.0f * clamp1(a[0]));
+    s->rc[1] = (uint16_t)(1500.0f + 500.0f * clamp1(a[1]));
+    s->rc[2] = (uint16_t)(1500.0f + 500.0f * clamp1(a[2]));
+    s->rc[3] = (uint16_t)(1500.0f + 500.0f * clamp1(a[3]));
+
+    const float *sn = &sensors[(uint64_t)k * 7];
+    bflSetGyroAccel(sn[0], sn[1], sn[2], sn[3], sn[4], sn[5]);
+    bflSetBaro((int32_t)sn[6]);
+
+    for (uint32_t n = 0; n < substeps; n++, s->ms++) {
+        bflSetRc(s->rc, BFL_MAX_RC_CHANNELS);
+        bflStepUs(CONTROL_STEP_US);
+
+        float m[4];
+        bflGetMotorsPwm(m, 4);
+        s->hash = fnv1a64(s->hash, m, sizeof(m));
+    }
+    s->episodeSteps++;
+
+    bflGetMotorsNormalised(&motors[(uint64_t)k * 4], 4);
+    armed[k] = bflIsArmed() ? 1 : 0;
+}
+
+// OSD readback: copy every instance's character grid (and displayport
+// attributes: severity + blink) into [N x rows*cols] host-visible
+// buffers. Pure readback — the firmware draws during its own OSD task
+// inside bflStepUs; this kernel just snapshots the grids for a renderer.
+#define BF_OSD_CELLS (16 * 30)
+const uint64_t __bf_osd_rows = 16;
+const uint64_t __bf_osd_cols = 30;
+
+KERNEL void bfOsdSnapshot(uint8_t *screens, uint8_t *attrs)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    memcpy(&screens[(uint64_t)k * BF_OSD_CELLS], bflOsdScreen(), BF_OSD_CELLS);
+    if (attrs) {
+        memcpy(&attrs[(uint64_t)k * BF_OSD_CELLS], bflOsdAttrs(), BF_OSD_CELLS);
+    }
 }
 
 // Collect the verdict inputs.

@@ -20,6 +20,7 @@ INCLUDE_DIRS := \
 MCU_COMMON_SRC  := \
         SIMULATOR/sitl_lockstep.c \
         SIMULATOR/sitl_lockstep_serial.c \
+        SIMULATOR/sitl_lockstep_osd.c \
         SIMULATOR/sitl_lockstep_physics.c \
         SIMULATOR/sitl_lockstep_instance.c \
         SIMULATOR/sitl_lockstep_main.c

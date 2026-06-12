@@ -53,6 +53,7 @@ static uint64_t readU64(CUmodule mod, const char *name)
 int main(int argc, char **argv)
 {
     const char *modulePath = "obj/gpu/fw.cubin";
+    const char *eepromPath = nullptr;
     unsigned instances = 16;
     unsigned perturb = UINT32_MAX;
     int flySeconds = 10;
@@ -71,13 +72,15 @@ int main(int argc, char **argv)
             chunkMs = (unsigned)atoi(argv[++i]);
         } else if (!strcmp(argv[i], "--module") && i + 1 < argc) {
             modulePath = argv[++i];
+        } else if (!strcmp(argv[i], "--eeprom") && i + 1 < argc) {
+            eepromPath = argv[++i];
         } else if (!strcmp(argv[i], "--test-reset")) {
             testReset = true;
         } else if (!strcmp(argv[i], "--test-step")) {
             testStep = true;
         } else {
             fprintf(stderr,
-                    "usage: %s [--instances N] [--perturb K] [--seconds N] [--chunk MS] [--module FILE] [--test-reset]\n",
+                    "usage: %s [--instances N] [--perturb K] [--seconds N] [--chunk MS] [--module FILE] [--eeprom FILE] [--test-reset]\n",
                     argv[0]);
             return 1;
         }
@@ -157,6 +160,37 @@ int main(int argc, char **argv)
         void *args[] = { &stateBuf, &perturb };
         launch(fInit, args);
         printf("[gpu] instances created\n");
+    }
+    if (eepromPath) {
+        // preload a boot-ready config image (from the CPU --cli-dump
+        // converter) into every instance's RAM EEPROM before boot
+        FILE *f = fopen(eepromPath, "rb");
+        if (!f) {
+            fprintf(stderr, "[gpu] cannot open eeprom image '%s'\n", eepromPath);
+            return 1;
+        }
+        fseek(f, 0, SEEK_END);
+        const uint64_t eeLen = (uint64_t)ftell(f);
+        rewind(f);
+        std::vector<uint8_t> ee(eeLen);
+        if (fread(ee.data(), 1, eeLen, f) != eeLen) {
+            fprintf(stderr, "[gpu] failed to read '%s'\n", eepromPath);
+            return 1;
+        }
+        fclose(f);
+
+        CUfunction fLoadEeprom;
+        CU(cuModuleGetFunction(&fLoadEeprom, mod, "bfLoadEeprom"));
+        CUdeviceptr eeBuf;
+        CU(cuMemAlloc(&eeBuf, eeLen));
+        CU(cuMemcpyHtoD(eeBuf, ee.data(), eeLen));
+        uint64_t len = eeLen;
+        uint32_t perInstance = 0;
+        void *args[] = { &eeBuf, &len, &perInstance };
+        launch(fLoadEeprom, args);
+        CU(cuMemFree(eeBuf));
+        printf("[gpu] eeprom preloaded from '%s' (%llu bytes, broadcast)\n",
+               eepromPath, (unsigned long long)eeLen);
     }
     {
         void *args[] = { &stateBuf };

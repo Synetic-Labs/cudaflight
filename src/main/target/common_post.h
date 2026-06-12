@@ -663,8 +663,10 @@
 #endif
 #endif
 
-#if ENABLE_SIMULATOR || defined(UNIT_TEST)
-// This feature uses 'arm_math.h', which does not exist for x86.
+#if (ENABLE_SIMULATOR || defined(UNIT_TEST)) && !defined(SIMULATOR_DYN_NOTCH)
+// Historical: the original implementation used 'arm_math.h', which does
+// not exist for x86. The SDFT implementation is portable float math, so
+// simulator targets may opt back in with SIMULATOR_DYN_NOTCH.
 #undef USE_DYN_NOTCH_FILTER
 #endif
 

@@ -46,7 +46,7 @@ class _CudaArray:
 
 class BetaflightEnv:
     def __init__(self, num_envs, cubin=None, lib=None, decimation=10,
-                 device_index=0, settle_ms=0, auto_reset=True):
+                 device_index=0, settle_ms=0, auto_reset=True, eeprom=None):
         cubin = str(cubin or _DEFAULT_OUT / "fw.cubin")
         lib = str(lib or _DEFAULT_OUT / "libbfgym.so")
         self.decimation = decimation
@@ -59,7 +59,9 @@ class BetaflightEnv:
         torch.cuda.set_device(self.device)
 
         self._lib = _load(lib)
-        self._h = self._lib.bfgym_create(cubin.encode(), num_envs, device_index, settle_ms)
+        self._h = self._lib.bfgym_create_eeprom(
+            cubin.encode(), num_envs, device_index, settle_ms,
+            str(eeprom).encode() if eeprom else None)
         if not self._h:
             raise RuntimeError(f"bfgym_create failed: {self._lib.bfgym_error().decode()}")
 
@@ -74,6 +76,14 @@ class BetaflightEnv:
         self.obs = wrap(self._lib.bfgym_obs_ptr(self._h), (n, self.obs_dim), "<f4")
         self.rewards = wrap(self._lib.bfgym_rewards_ptr(self._h), (n,), "<f4")
         self.dones = wrap(self._lib.bfgym_dones_ptr(self._h), (n,), "|u1")
+
+        # OSD character grids: each instance's firmware draws a MAX7456-style
+        # screen; osd_update() refreshes these [N, rows, cols] uint8 views.
+        self.osd_rows = self._lib.bfgym_osd_rows(self._h)
+        self.osd_cols = self._lib.bfgym_osd_cols(self._h)
+        grid = (n, self.osd_rows, self.osd_cols)
+        self.osd = wrap(self._lib.bfgym_osd_ptr(self._h), grid, "|u1")
+        self.osd_attrs = wrap(self._lib.bfgym_osd_attrs_ptr(self._h), grid, "|u1")
 
     def _check(self, rc):
         if rc != 0:
@@ -103,6 +113,11 @@ class BetaflightEnv:
     def snapshot(self):
         """Retake the episode-start snapshot at the current state."""
         self._check(self._lib.bfgym_snapshot(self._h))
+
+    def osd_update(self):
+        """Snapshot every instance's OSD grid into self.osd / self.osd_attrs."""
+        self._check(self._lib.bfgym_osd_update(self._h))
+        return self.osd, self.osd_attrs
 
     def hashes(self):
         """Per-instance motor-trace hashes (the determinism oracle)."""

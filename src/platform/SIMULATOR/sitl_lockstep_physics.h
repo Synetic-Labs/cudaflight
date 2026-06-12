@@ -41,6 +41,7 @@ typedef struct quadSim_s {
     double pos[3];      // world position, m (NED: pos[2] <= 0 above ground)
     double vel[3];      // world velocity, m/s
     double rotor[4];    // lagged normalised rotor command [0..1]
+    double yawDir;      // +1 default prop rotation, -1 yaw_motors_reversed
     bool onGround;
 
     // last computed outputs (for telemetry)
