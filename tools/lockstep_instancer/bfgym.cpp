@@ -475,6 +475,18 @@ int bfgym_osd_update(bfgym *g)
     return launch(g, g->fOsd, args);
 }
 
+// ---------------------------------------------------------------------------
+// Raw launch parameters for external launchers (e.g. an XLA FFI handler
+// that runs bfFwStep inside a jitted JAX program, on XLA's stream, with
+// no synchronization). The caller owns stream ordering; the kernel only
+// touches the firmware blobs plus whatever buffers the caller passes.
+
+uint64_t bfgym_fw_step_kernel(bfgym *g) { return (uint64_t)g->fFwStep; }
+uint64_t bfgym_state_ptr(bfgym *g) { return (uint64_t)g->stateBuf; }
+uint64_t bfgym_ctx(bfgym *g) { return (uint64_t)g->ctx; }
+uint32_t bfgym_grid(bfgym *g) { return g->grid; }
+uint32_t bfgym_block(bfgym *g) { return g->block; }
+
 // Motor-trace hashes (host out, n entries) — the determinism oracle.
 int bfgym_hashes(bfgym *g, uint64_t *out)
 {

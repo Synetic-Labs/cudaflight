@@ -39,12 +39,13 @@ def load_font_atlas(path=None):
     data = data[:expected].reshape(GLYPHS, GLYPH_H, 3)
 
     # unpack 2-bit pixels (this table is LSB-first within each byte —
-    # mcm2h.py reorders them): 00 black, 10 white, x1 transparent
+    # mcm2h.py reorders them). PICO fb convention, NOT raw MCM:
+    # 00 background/skip, 10 white, 01/11 black outline
     shifts = np.array([0, 2, 4, 6], dtype=np.uint8)
     px = (data[..., :, None] >> shifts) & 0b11          # [256, 18, 3, 4]
     px = px.reshape(GLYPHS, GLYPH_H, GLYPH_W)
-    atlas = np.full(px.shape, _PX_TRANSPARENT, dtype=np.uint8)
-    atlas[px == 0b00] = _PX_BLACK
+    atlas = np.full(px.shape, _PX_BLACK, dtype=np.uint8)
+    atlas[px == 0b00] = _PX_TRANSPARENT
     atlas[px == 0b10] = _PX_WHITE
     return atlas
 
