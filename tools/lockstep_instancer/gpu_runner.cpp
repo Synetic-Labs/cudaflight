@@ -10,6 +10,7 @@
 
 #include <cuda.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -57,6 +58,7 @@ int main(int argc, char **argv)
     int flySeconds = 10;
     unsigned chunkMs = 250;
     bool testReset = false;
+    bool testStep = false;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--instances") && i + 1 < argc) {
@@ -71,6 +73,8 @@ int main(int argc, char **argv)
             modulePath = argv[++i];
         } else if (!strcmp(argv[i], "--test-reset")) {
             testReset = true;
+        } else if (!strcmp(argv[i], "--test-step")) {
+            testStep = true;
         } else {
             fprintf(stderr,
                     "usage: %s [--instances N] [--perturb K] [--seconds N] [--chunk MS] [--module FILE] [--test-reset]\n",
@@ -119,13 +123,14 @@ int main(int argc, char **argv)
         CU(cuMemcpyHtoD(globalAddr(mod, "__bf_inst_count"), &instances, sizeof(instances)));
     }
 
-    CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset;
+    CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep;
     CU(cuModuleGetFunction(&fInit, mod, "bfInstanceInit"));
     CU(cuModuleGetFunction(&fBoot, mod, "bfBoot"));
     CU(cuModuleGetFunction(&fRun, mod, "bfRun"));
     CU(cuModuleGetFunction(&fFinish, mod, "bfFinish"));
     CU(cuModuleGetFunction(&fSnapshot, mod, "bfSnapshot"));
     CU(cuModuleGetFunction(&fReset, mod, "bfReset"));
+    CU(cuModuleGetFunction(&fStep, mod, "bfStep"));
 
     const unsigned block = 32;
     const unsigned grid = (instances + block - 1) / block;
@@ -245,6 +250,156 @@ int main(int argc, char **argv)
 
         printf("[reset-test] %s\n", ok ? "PASS" : "FAIL");
         return ok ? 0 : 5;
+    }
+
+    if (testStep) {
+        // Oracle for the gym-style step interface: (A) identical action
+        // sequences replay bit-exactly across a reset; (B) a host-side
+        // P-controller can hover the firmware at 5m purely through the
+        // obs/action buffers; (C) throttle cut crashes, dones raise, and
+        // bfReset(dones) restores the crashed instances.
+        const uint64_t actDim = readU64(mod, "__bf_act_dim");
+        const uint64_t obsDim = readU64(mod, "__bf_obs_dim");
+        printf("[step-test] act_dim=%llu obs_dim=%llu\n",
+               (unsigned long long)actDim, (unsigned long long)obsDim);
+
+        CUdeviceptr snapBuf, snapStBuf, actBuf, obsBuf, rewBuf, doneBuf;
+        CU(cuMemAlloc(&snapBuf, stride * instances));
+        CU(cuMemAlloc(&snapStBuf, stateSize * instances));
+        CU(cuMemAlloc(&actBuf, 4 * actDim * instances));
+        CU(cuMemAlloc(&obsBuf, 4 * obsDim * instances));
+        CU(cuMemAlloc(&rewBuf, 4 * instances));
+        CU(cuMemAlloc(&doneBuf, instances));
+
+        std::vector<float> act(actDim * instances, 0.0f);
+        std::vector<float> obs(obsDim * instances);
+        std::vector<uint8_t> done(instances);
+        uint32_t decimation = 10;
+
+        auto step = [&]() {
+            CU(cuMemcpyHtoD(actBuf, act.data(), 4 * actDim * instances));
+            void *args[] = { &stateBuf, &actBuf, &obsBuf, &rewBuf, &doneBuf, &decimation };
+            launch(fStep, args);
+            CU(cuMemcpyDtoH(obs.data(), obsBuf, 4 * obsDim * instances));
+            CU(cuMemcpyDtoH(done.data(), doneBuf, instances));
+        };
+        auto setThrottle = [&](unsigned k, float v) { act[k * actDim + 2] = v; };
+        auto altitude = [&](unsigned k) { return -obs[k * obsDim + 2]; };
+        auto resetWith = [&](CUdeviceptr flags) {
+            void *args[] = { &stateBuf, &snapStBuf, &snapBuf, &flags, };
+            launch(fReset, args);
+        };
+
+        runMs(7000); // settle + arm
+        {
+            void *args[] = { &stateBuf, &snapStBuf, &snapBuf };
+            launch(fSnapshot, args);
+        }
+        CUdeviceptr allFlags;
+        CU(cuMemAlloc(&allFlags, instances));
+        {
+            std::vector<uint8_t> all(instances, 1);
+            CU(cuMemcpyHtoD(allFlags, all.data(), instances));
+        }
+
+        bool ok = true;
+
+        // (A) determinism across reset
+        std::vector<uint64_t> hA;
+        std::vector<float> obsA;
+        for (int pass = 0; pass < 2; pass++) {
+            if (pass == 1) {
+                resetWith(allFlags);
+            }
+            for (int i = 0; i < 200; i++) {
+                const float thr = 0.36f + 0.1f * sinf(0.1f * (float)i);
+                for (unsigned k = 0; k < instances; k++) {
+                    setThrottle(k, thr);
+                }
+                step();
+            }
+            std::vector<uint64_t> h;
+            readHashes(h);
+            if (pass == 0) {
+                hA = h;
+                obsA = obs;
+            } else {
+                for (unsigned k = 0; k < instances; k++) {
+                    if (h[k] != hA[k]) {
+                        fprintf(stderr, "[step-test] A: instance %u hash replay mismatch\n", k);
+                        ok = false;
+                    }
+                }
+                if (memcmp(obs.data(), obsA.data(), 4 * obsDim * instances) != 0) {
+                    fprintf(stderr, "[step-test] A: obs replay mismatch\n");
+                    ok = false;
+                }
+            }
+        }
+        printf("[step-test] A determinism-across-reset: %s\n", ok ? "bit-exact" : "FAILED");
+
+        // (B) closed-loop hover at 5m through the obs/action interface
+        resetWith(allFlags);
+        for (unsigned k = 0; k < instances; k++) {
+            setThrottle(k, 0.6f); // initial climb before first obs
+        }
+        for (int i = 0; i < 1000; i++) { // 10s sim at decimation 10
+            step();
+            for (unsigned k = 0; k < instances; k++) {
+                const float alt = altitude(k);
+                const float vzUp = -obs[k * obsDim + 5];
+                float thr = 0.36f + 0.22f * (5.0f - alt) - 0.12f * vzUp;
+                setThrottle(k, thr < -1.0f ? -1.0f : (thr > 1.0f ? 1.0f : thr));
+            }
+        }
+        {
+            float meanAlt = 0;
+            bool anyDone = false, inBand = true;
+            for (unsigned k = 0; k < instances; k++) {
+                meanAlt += altitude(k);
+                anyDone = anyDone || done[k];
+                inBand = inBand && altitude(k) > 3.5f && altitude(k) < 6.5f;
+            }
+            meanAlt /= (float)instances;
+            printf("[step-test] B hover-P-controller: mean alt %.2fm after 10s, dones=%d, in-band=%d\n",
+                   (double)meanAlt, (int)anyDone, (int)inBand);
+            ok = ok && !anyDone && inBand;
+        }
+
+        // (C) throttle cut -> crash -> dones as reset mask -> restored
+        for (unsigned k = 0; k < instances; k++) {
+            setThrottle(k, -1.0f);
+        }
+        int crashSteps = 0;
+        bool allDone = false;
+        for (; crashSteps < 300 && !allDone; crashSteps++) {
+            step();
+            allDone = true;
+            for (unsigned k = 0; k < instances; k++) {
+                allDone = allDone && done[k];
+            }
+        }
+        printf("[step-test] C crash: all done after %d steps (%.1fs fall): %s\n",
+               crashSteps, crashSteps * decimation / 1000.0, allDone ? "yes" : "NO");
+        ok = ok && allDone;
+
+        resetWith(doneBuf); // auto-reset composition: dones are the mask
+        for (unsigned k = 0; k < instances; k++) {
+            setThrottle(k, 0.36f);
+        }
+        step();
+        {
+            bool grounded = true, anyDone = false;
+            for (unsigned k = 0; k < instances; k++) {
+                grounded = grounded && altitude(k) < 0.5f;
+                anyDone = anyDone || done[k];
+            }
+            printf("[step-test] C restore: grounded=%d dones=%d\n", (int)grounded, (int)anyDone);
+            ok = ok && grounded && !anyDone;
+        }
+
+        printf("[step-test] %s\n", ok ? "PASS" : "FAIL");
+        return ok ? 0 : 6;
     }
 
     const unsigned totalMs = (6 + 1 + (unsigned)flySeconds) * 1000; // settle + arm + fly

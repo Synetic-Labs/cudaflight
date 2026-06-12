@@ -11,6 +11,7 @@
 // through real firmware functions, never macros or static-inline PG
 // accessors (they would read the template image).
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -52,12 +53,18 @@ typedef struct {
     quadSim_t sim;
     uint16_t rc[BFL_MAX_RC_CHANNELS];
     uint64_t hash;
-    uint32_t ms;        // absolute control step count
+    uint32_t ms;            // absolute control step count
+    uint32_t episodeSteps;  // bfStep calls since boot/reset
     uint8_t perturbed;
+    uint8_t airborne;       // has left the ground this episode
 } bfFlight_t;
 
-// host reads this to size the flight-state buffer
+// host reads these to size the RL buffers
 const uint64_t __bf_state_size = sizeof(bfFlight_t);
+#define BF_ACT_DIM 4
+#define BF_OBS_DIM 17
+const uint64_t __bf_act_dim = BF_ACT_DIM;
+const uint64_t __bf_obs_dim = BF_OBS_DIM;
 
 static inline unsigned self(void)
 {
@@ -205,6 +212,79 @@ KERNEL void bfReset(bfFlight_t *st, bfFlight_t *snapSt, char *snapBase, const ui
     memcpy(__bf_inst_base + (uint64_t)k * __bf_inst_stride,
            snapBase + (uint64_t)k * __bf_inst_stride, __bf_image_size);
     st[k] = snapSt[k];
+}
+
+static float clamp1(float v)
+{
+    return v < -1.0f ? -1.0f : (v > 1.0f ? 1.0f : v);
+}
+
+// Gym-style step: apply held actions for `decimation` control steps (1ms
+// each), then write observations and the built-in hover task's
+// reward/done. Obs carry the full physical state, so a training loop is
+// free to recompute reward/done from the obs tensors instead (no cubin
+// rebuild to iterate on reward shaping). `dones` has the exact layout
+// bfReset() takes as its flag mask: auto-reset = bfStep -> bfReset(dones).
+//
+// actions: [N x 4] floats in [-1,1], AETR order (roll, pitch, throttle,
+// yaw), mapped to 1000..2000us RC — the policy flies the same stick
+// interface a human does.
+// obs: [N x 17]: pos NED (3), vel NED (3), quat w,x,y,z (4), body rates
+// rad/s (3), normalised motors (4).
+KERNEL void bfStep(bfFlight_t *st, const float *actions, float *obs,
+                   float *rewards, uint8_t *dones, uint32_t decimation)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    bfFlight_t *s = &st[k];
+
+    const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
+    s->rc[0] = (uint16_t)(1500.0f + 500.0f * clamp1(a[0]));
+    s->rc[1] = (uint16_t)(1500.0f + 500.0f * clamp1(a[1]));
+    s->rc[2] = (uint16_t)(1500.0f + 500.0f * clamp1(a[2]));
+    s->rc[3] = (uint16_t)(1500.0f + 500.0f * clamp1(a[3]));
+
+    for (uint32_t n = 0; n < decimation; n++) {
+        controlStep(s);
+    }
+    s->episodeSteps++;
+
+    const float alt = (float)quadSimAltitude(&s->sim);
+    if (alt > 0.3f) {
+        s->airborne = 1;
+    }
+
+    float *o = &obs[(uint64_t)k * BF_OBS_DIM];
+    for (int i = 0; i < 3; i++) {
+        o[i] = (float)s->sim.pos[i];
+        o[3 + i] = (float)s->sim.vel[i];
+        o[10 + i] = (float)s->sim.omega[i];
+    }
+    for (int i = 0; i < 4; i++) {
+        o[6 + i] = (float)s->sim.q[i];
+    }
+    bflGetMotorsNormalised(&o[13], 4);
+
+    // built-in hover task: hold the spawn xy at 5m altitude
+    const bool armed = bflIsArmed();
+    const bool crashed = s->airborne && s->sim.onGround;
+    const bool flyaway = alt > 100.0f ||
+                         o[0] > 100.0f || o[0] < -100.0f ||
+                         o[1] > 100.0f || o[1] < -100.0f;
+    const bool done = !armed || crashed || flyaway;
+
+    const float dz = o[2] + 5.0f; // target pz = -5 (NED)
+    const float posErr = sqrtf(o[0] * o[0] + o[1] * o[1] + dz * dz);
+    const float velMag = sqrtf(o[3] * o[3] + o[4] * o[4] + o[5] * o[5]);
+    const float rateMag = sqrtf(o[10] * o[10] + o[11] * o[11] + o[12] * o[12]);
+    float r = 2.0f - 0.5f * posErr - 0.1f * velMag - 0.05f * rateMag;
+    if (done) {
+        r = -10.0f;
+    }
+    rewards[k] = r;
+    dones[k] = done ? 1 : 0;
 }
 
 // Collect the verdict inputs.

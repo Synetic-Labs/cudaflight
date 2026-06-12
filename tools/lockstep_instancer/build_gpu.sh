@@ -100,14 +100,15 @@ llvm-link "$OUT/fw_gpu_inst.bc" \
     -o "$OUT/whole.bc"
 
 echo "== internalize + DCE + codegen"
-KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build"
+KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build"
 opt -passes='internalize,globaldce' -internalize-public-api-list="$KEEP" \
     "$OUT/whole.bc" -o "$OUT/whole_dce.bc"
 clang -target nvptx64-nvidia-cuda -march=$GPUARCH -O3 -x ir "$OUT/whole_dce.bc" -S -o "$OUT/fw.ptx"
 ptxas -arch=$GPUARCH -O3 "$OUT/fw.ptx" -o "$OUT/fw.cubin"
 echo "   $(grep -c '^\.visible \.entry\|^.visible .entry' "$OUT/fw.ptx" || true) kernels, $(wc -c < "$OUT/fw.cubin") B cubin"
 
-echo "== host runner"
+echo "== host runner + bfgym shared lib"
 g++ -O2 tools/lockstep_instancer/gpu_runner.cpp -I/opt/cuda/include -lcuda -o "$OUT/gpu_runner"
+g++ -O2 -shared -fPIC tools/lockstep_instancer/bfgym.cpp -I/opt/cuda/include -lcuda -o "$OUT/libbfgym.so"
 
 echo "== done: $OUT/gpu_runner --module $OUT/fw.cubin"
