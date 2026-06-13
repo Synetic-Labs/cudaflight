@@ -487,6 +487,13 @@ uint64_t bfgym_ctx(bfgym *g) { return (uint64_t)g->ctx; }
 uint32_t bfgym_grid(bfgym *g) { return g->grid; }
 uint32_t bfgym_block(bfgym *g) { return g->block; }
 
+// Reset kernel (bfReset) launch params, for an in-jit masked reset FFI.
+// bfReset(state, snapSt, snap, mask): restores masked instances to the
+// snapshot. Same grid/block/ctx as the step kernel above.
+uint64_t bfgym_reset_kernel(bfgym *g) { return (uint64_t)g->fReset; }
+uint64_t bfgym_snap_state_ptr(bfgym *g) { return (uint64_t)g->snapStBuf; }
+uint64_t bfgym_snap_ptr(bfgym *g) { return (uint64_t)g->snapBuf; }
+
 // Motor-trace hashes (host out, n entries) — the determinism oracle.
 int bfgym_hashes(bfgym *g, uint64_t *out)
 {
