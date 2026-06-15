@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 static char g_err[512];
@@ -44,7 +45,7 @@ struct bfgym {
     CUcontext ctx;          // primary context, retained
     CUmodule mod;
     CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep, fFwStep;
-    CUfunction fOsd, fGradFD, fRateEval;
+    CUfunction fOsd, fGradFD, fRateEval, fJacFD, fSetBase;
     uint32_t n;
     unsigned grid, block;
     uint64_t imageSize, stride, stateSize, actDim, obsDim;
@@ -56,6 +57,8 @@ struct bfgym {
     CUdeviceptr osdBuf, osdAttrBuf; // OSD char grids: [n x rows*cols] u8 each
     CUdeviceptr seedBuf, dactBuf;   // FD gradient: [n x 4] motor cotangent in, [n x 4] action grad out
     CUdeviceptr gradScratch;        // [n x stride] per-instance blob save for FD restore
+    CUdeviceptr fullRelocBuf;       // complete {loc, targetOff} reloc table (static + runtime)
+    uint64_t fullRelocCount;        // entries in fullRelocBuf (0 if not discovered)
 };
 
 // The primary context may not be current on the calling thread (or torch
@@ -116,6 +119,91 @@ static int writeGlobal(bfgym *g, const char *name, const void *src, size_t len)
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Complete relocation discovery.
+//
+// __bf_relocs (emitted by the instancer) covers only pointer slots present in
+// the compile-time template initializer. The firmware writes MORE self-pointers
+// at boot (scheduler queue, currentPidProfile, ...) that are absent from that
+// table — which is exactly why a *booted* blob is position-DEPENDENT: a snapshot
+// is only valid restored to its original address (see bfReset/bfSnapshot).
+//
+// We recover the complete set empirically. Instances boot deterministically
+// identical except for their self-pointers, so a pointer-sized word at blob
+// offset `o` is a self-pointer iff its value across instances forms an
+// arithmetic progression with common difference == stride:
+//     word_k(o) = instBuf + k*stride + targetOff.
+// Diffing instances 0/1 finds candidates; instance 2 cross-validates exactly.
+// A non-pointer instance-divergent byte (e.g. the per-instance OSD craft name)
+// does NOT form such a progression, so it is neither found nor falsely flagged.
+// The result is a complete {loc, targetOff} table — same layout/semantics as
+// __bf_relocs — usable to rebase a booted blob to ANY address.
+static int discoverRelocs(bfgym *g)
+{
+    if (g->n < 3) {
+        fprintf(stderr, "[bfgym-reloc] need >=3 instances to discover relocs; "
+                        "skipped (n=%u)\n", g->n);
+        return 0;
+    }
+    const uint64_t stride = g->stride;
+    const uint64_t base = (uint64_t)g->instBuf;
+    const uint64_t words = g->imageSize / 8;
+
+    std::vector<uint64_t> b0(words), b1(words), b2(words);
+    if (!cuOk(cuMemcpyDtoH(b0.data(), g->snapBuf + 0 * stride, g->imageSize), "reloc read 0") ||
+        !cuOk(cuMemcpyDtoH(b1.data(), g->snapBuf + 1 * stride, g->imageSize), "reloc read 1") ||
+        !cuOk(cuMemcpyDtoH(b2.data(), g->snapBuf + 2 * stride, g->imageSize), "reloc read 2")) {
+        return -1;
+    }
+
+    std::vector<std::pair<uint64_t, uint64_t>> table; // {loc bytes, targetOff}
+    uint64_t inconsistent = 0;
+    for (uint64_t w = 0; w < words; w++) {
+        const bool found = (b1[w] - b0[w] == stride);       // candidate from 0/1
+        const bool confirm = (b2[w] - b0[w] == 2 * stride); // 3rd-instance check
+        if (found && confirm) {
+            table.push_back({ w * 8, b0[w] - base });       // inst0 ptr -> offset
+        } else if (found || confirm) {
+            inconsistent++; // looks like a pointer in one pair but not the other
+        }
+    }
+
+    int err = 0;
+    const uint64_t staticCount = readU64(g, "__bf_reloc_count", &err);
+    printf("[bfgym-reloc] discovered %zu self-pointers (static table had %llu; "
+           "%lld runtime-written recovered), %llu inconsistent words\n",
+           table.size(), (unsigned long long)staticCount,
+           (long long)table.size() - (long long)(err ? 0 : staticCount),
+           (unsigned long long)inconsistent);
+    if (inconsistent) {
+        // Any inconsistency means the arithmetic-progression assumption was
+        // violated for some word — discovery cannot be trusted as complete.
+        snprintf(g_err, sizeof(g_err),
+                 "reloc discovery found %llu inconsistent words; table not complete",
+                 (unsigned long long)inconsistent);
+        fprintf(stderr, "[bfgym-reloc] FAIL: %s\n", g_err);
+        return -1;
+    }
+
+    // Upload the complete table for later use (rebase-on-move).
+    g->fullRelocCount = table.size();
+    if (table.empty()) {
+        return 0;
+    }
+    if (!cuOk(cuMemAlloc(&g->fullRelocBuf, 16 * table.size()), "alloc full relocs") ||
+        !cuOk(cuMemcpyHtoD(g->fullRelocBuf, table.data(), 16 * table.size()),
+              "upload full relocs")) {
+        return -1;
+    }
+    // Publish the table to the device so the kernels' rebase-on-move can find it.
+    if (writeGlobal(g, "__bf_full_relocs", &g->fullRelocBuf, sizeof(g->fullRelocBuf)) ||
+        writeGlobal(g, "__bf_full_reloc_count", &g->fullRelocCount, sizeof(g->fullRelocCount))) {
+        return -1;
+    }
+    printf("[bfgym-reloc] PASS: complete reloc table validated across 3 instances\n");
+    return 0;
+}
+
 extern "C" {
 
 const char *bfgym_error(void)
@@ -133,7 +221,7 @@ void bfgym_destroy(bfgym *g)
                            g->actBuf, g->obsBuf, g->rewBuf, g->doneBuf,
                            g->hashBuf, g->altBuf, g->armedBuf,
                            g->sensBuf, g->motorBuf, g->osdBuf, g->osdAttrBuf,
-                           g->seedBuf, g->dactBuf, g->gradScratch }) {
+                           g->seedBuf, g->dactBuf, g->gradScratch, g->fullRelocBuf }) {
         if (p) {
             cuMemFree(p);
         }
@@ -259,6 +347,8 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
     // module was built with the FD control core). Non-fatal if absent.
     cuModuleGetFunction(&g->fGradFD, g->mod, "bfFwStepGradFD");
     cuModuleGetFunction(&g->fRateEval, g->mod, "bfRateEval");
+    cuModuleGetFunction(&g->fJacFD, g->mod, "bfFwStepJacFD");
+    cuModuleGetFunction(&g->fSetBase, g->mod, "bfSetBase");
 
     uint32_t perturb = UINT32_MAX;
     void *initArgs[] = { &g->stateBuf, &perturb };
@@ -331,6 +421,14 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
     }
 
     if (launch(g, g->fSnapshot, snapArgs)) {
+        bfgym_destroy(g);
+        return nullptr;
+    }
+
+    // Recover the complete relocation table (static + runtime-written pointers)
+    // from the just-snapshotted fleet. Required for position-independent blob
+    // handling; aborts create if the table cannot be validated as complete.
+    if (discoverRelocs(g)) {
         bfgym_destroy(g);
         return nullptr;
     }
@@ -563,12 +661,112 @@ uint64_t bfgym_ctx(bfgym *g) { return (uint64_t)g->ctx; }
 uint32_t bfgym_grid(bfgym *g) { return g->grid; }
 uint32_t bfgym_block(bfgym *g) { return g->block; }
 
+// Pure (value-threaded) FFI path: the firmware blob and bfFlight_t state become
+// donated JAX buffers. bfSetBase sets the per-launch instance base; the blob is
+// `stride` bytes/instance, the bfFlight_t state `stateSize` bytes/instance. The
+// initial values are copied from the episode-start snapshot buffers
+// (bfgym_snap_ptr / bfgym_snap_state_ptr).
+uint64_t bfgym_set_base_kernel(bfgym *g) { return (uint64_t)g->fSetBase; }
+uint64_t bfgym_stride(bfgym *g) { return g->stride; }
+uint64_t bfgym_state_size(bfgym *g) { return g->stateSize; }
+uint64_t bfgym_inst_ptr(bfgym *g) { return (uint64_t)g->instBuf; }
+
 // Reset kernel (bfReset) launch params, for an in-jit masked reset FFI.
 // bfReset(state, snapSt, snap, mask): restores masked instances to the
 // snapshot. Same grid/block/ctx as the step kernel above.
 uint64_t bfgym_reset_kernel(bfgym *g) { return (uint64_t)g->fReset; }
 uint64_t bfgym_snap_state_ptr(bfgym *g) { return (uint64_t)g->snapStBuf; }
 uint64_t bfgym_snap_ptr(bfgym *g) { return (uint64_t)g->snapBuf; }
+
+// Raw launch params for the in-jit FD Jacobian FFI: bfFwStepJacFD(actions,
+// jacOut[N,16], scratch, eps) computes J[k][i][d] = d(motor_i)/d(action_d) of
+// the real control law at the current per-instance state. gradScratch is the
+// per-instance blob save buffer the kernel uses for state restore.
+uint64_t bfgym_jac_fd_kernel(bfgym *g) { return (uint64_t)g->fJacFD; }
+uint64_t bfgym_grad_scratch_ptr(bfgym *g) { return (uint64_t)g->gradScratch; }
+
+// Self-test for position-independent relocation: run a deterministic burst from
+// the snapshot, relocate the whole fleet's blobs to a freshly allocated buffer
+// (copy bytes + repoint the global base; rebase-on-move fixes the pointers on
+// the next step), run the identical burst, and compare motor-trace hashes.
+// Bit-identical hashes prove relocation is exact. Returns 0 on full match, 1 on
+// any mismatch, -1 on error. Restores the original buffer/base before returning
+// (call bfgym_reset_all before normal use afterwards).
+int bfgym_hashes(bfgym *g, uint64_t *out); // defined below
+
+int bfgym_relocate_selftest(bfgym *g)
+{
+    CtxGuard guard(g->ctx);
+    if (!g->fullRelocCount) {
+        snprintf(g_err, sizeof(g_err), "no reloc table (need >=3 instances)");
+        return -1;
+    }
+    const uint32_t STEPS = 200, DEC = 10;
+    std::vector<uint64_t> h1(g->n), h2(g->n);
+
+    // reference burst at the original base
+    if (bfgym_reset_all(g)) {
+        return -1;
+    }
+    for (uint32_t i = 0; i < STEPS; i++) {
+        if (bfgym_step(g, DEC)) {
+            return -1;
+        }
+    }
+    if (bfgym_hashes(g, h1.data())) {
+        return -1;
+    }
+
+    // relocate: move the blob bytes to a fresh buffer and repoint the base.
+    CUdeviceptr alt = 0;
+    if (!cuOk(cuMemAlloc(&alt, g->stride * g->n), "alloc relocate") ||
+        !cuOk(cuMemcpyDtoD(alt, g->instBuf, g->stride * g->n), "copy blob")) {
+        if (alt) {
+            cuMemFree(alt);
+        }
+        return -1;
+    }
+    const CUdeviceptr origInst = g->instBuf;
+    char *altBase = (char *)alt;
+    if (writeGlobal(g, "__bf_inst_base", &altBase, sizeof(altBase))) {
+        cuMemFree(alt);
+        return -1;
+    }
+    g->instBuf = alt; // reset/step now operate on the relocated buffer
+
+    // identical burst at the new base — rebase-on-entry fires on the first step
+    int rc = 0;
+    if (bfgym_reset_all(g)) {
+        rc = -1;
+    }
+    for (uint32_t i = 0; i < STEPS && !rc; i++) {
+        if (bfgym_step(g, DEC)) {
+            rc = -1;
+        }
+    }
+    if (!rc && bfgym_hashes(g, h2.data())) {
+        rc = -1;
+    }
+
+    // restore the original buffer/base regardless of outcome
+    char *origBase = (char *)origInst;
+    writeGlobal(g, "__bf_inst_base", &origBase, sizeof(origBase));
+    g->instBuf = origInst;
+    cuMemFree(alt);
+    if (rc) {
+        return rc;
+    }
+
+    uint32_t mism = 0;
+    for (uint32_t k = 0; k < g->n; k++) {
+        if (h1[k] != h2[k]) {
+            mism++;
+        }
+    }
+    printf("[bfgym-reloc] relocate self-test: %u/%u instances bit-identical "
+           "after relocation\n", g->n - mism, g->n);
+    return mism ? 1 : 0;
+}
 
 // Motor-trace hashes (host out, n entries) — the determinism oracle.
 int bfgym_hashes(bfgym *g, uint64_t *out)

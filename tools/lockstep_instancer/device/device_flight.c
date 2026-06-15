@@ -39,6 +39,13 @@ extern char *__bf_inst_base;
 extern uint64_t __bf_inst_stride;
 extern uint32_t __bf_inst_count;
 
+// complete relocation table (static + runtime-written self-pointers),
+// discovered and uploaded by the host (bfgym.cpp discoverRelocs). Packed as
+// {loc, targetOff} pairs; used to rebase a blob whose bytes have moved to a
+// new base (e.g. XLA placed the buffer somewhere new). Null until discovered.
+extern const uint64_t *__bf_full_relocs;
+extern uint64_t __bf_full_reloc_count;
+
 #define KERNEL __attribute__((nvptx_kernel))
 
 #define CONTROL_STEP_US 1000
@@ -57,7 +64,27 @@ typedef struct {
     uint32_t episodeSteps;  // bfStep calls since boot/reset
     uint8_t perturbed;
     uint8_t airborne;       // has left the ground this episode
+    uint64_t blobBase;      // address this instance's blob pointers are based at
 } bfFlight_t;
+
+// Rebase-on-move: if the blob's current address `bp` differs from the address
+// its self-pointers are based at (s->blobBase), rewrite every recorded pointer
+// slot to point into the blob at `bp`. Idempotent and independent of the stale
+// value (uses absolute targetOff), so it self-heals after the host moves the
+// blob bytes (relocation) or restores a snapshot taken at another base. A no-op
+// when the base is unchanged — zero cost on the steady-state training path.
+static inline void bfRebaseSelf(bfFlight_t *s, char *bp)
+{
+    if ((uint64_t)bp == s->blobBase) {
+        return;
+    }
+    for (uint64_t r = 0; r < __bf_full_reloc_count; r++) {
+        const uint64_t loc = __bf_full_relocs[2 * r];
+        const uint64_t targetOff = __bf_full_relocs[2 * r + 1];
+        *(uint64_t *)(bp + loc) = (uint64_t)bp + targetOff;
+    }
+    s->blobBase = (uint64_t)bp;
+}
 
 // host reads these to size the RL buffers
 const uint64_t __bf_state_size = sizeof(bfFlight_t);
@@ -113,6 +140,7 @@ KERNEL void bfInstanceInit(bfFlight_t *st, uint32_t perturbIdx)
     memset(s, 0, sizeof(*s));
     s->hash = FNV_BASIS;
     s->perturbed = (k == perturbIdx);
+    s->blobBase = (uint64_t)blob; // pointers are based here after the reloc loop
 }
 
 // Preload the per-instance EEPROM (RAM-backed on GPU) with a boot-ready
@@ -187,6 +215,7 @@ KERNEL void bfRun(bfFlight_t *st, uint32_t msCount)
         return;
     }
     bfFlight_t *s = &st[k];
+    bfRebaseSelf(s, __bf_inst_base + (uint64_t)k * __bf_inst_stride);
 
     for (uint32_t n = 0; n < msCount; n++, s->ms++) {
         const uint32_t ms = s->ms;
@@ -271,6 +300,7 @@ KERNEL void bfStep(bfFlight_t *st, const float *actions, float *obs,
         return;
     }
     bfFlight_t *s = &st[k];
+    bfRebaseSelf(s, __bf_inst_base + (uint64_t)k * __bf_inst_stride);
 
     const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
     s->rc[0] = (uint16_t)(1500.0f + 500.0f * clamp1(a[0]));
@@ -341,6 +371,7 @@ KERNEL void bfFwStep(bfFlight_t *st, const float *actions, const float *sensors,
         return;
     }
     bfFlight_t *s = &st[k];
+    bfRebaseSelf(s, __bf_inst_base + (uint64_t)k * __bf_inst_stride);
 
     const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
     s->rc[0] = (uint16_t)(1500.0f + 500.0f * clamp1(a[0]));
@@ -364,6 +395,18 @@ KERNEL void bfFwStep(bfFlight_t *st, const float *actions, const float *sensors,
 
     bflGetMotorsNormalised(&motors[(uint64_t)k * 4], 4);
     armed[k] = bflIsArmed() ? 1 : 0;
+}
+
+// Set the per-launch instance base. The pure (value-threaded) FFI path threads
+// the firmware blob as a donated JAX buffer whose address XLA chooses, so the
+// global base must point at it before any firmware access. Launched 1-thread,
+// stream-ordered ahead of bfFwStep/bfReset; rebase-on-entry (bfRebaseSelf) then
+// fixes the 212 self-pointers for that address on the step that follows.
+KERNEL void bfSetBase(char *base)
+{
+    if (self() == 0) {
+        __bf_inst_base = base;
+    }
 }
 
 // Debug/baseline: run the control core once per instance for the given action
@@ -444,6 +487,45 @@ KERNEL void bfFwStepGradFD(const float *actions, const float *seedMotors,
             g += seed[i] * jac[i][d];
         }
         dActions[(uint64_t)k * BF_ACT_DIM + d] = g;
+    }
+}
+
+// Same finite-difference Jacobian as bfFwStepGradFD, but writes the full
+// [N x 4 x 4] tensor jacOut[k][i][d] = d(motor_i)/d(action_d) instead of
+// contracting with a seed. Used by the JAX custom_vjp: compute J once in the
+// forward pass, store it, contract J^T . cotangent in the backward pass (pure
+// JAX, so the backward never touches the firmware's mutable state).
+KERNEL void bfFwStepJacFD(const float *actions, float *jacOut, char *scratch, float eps)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    char *blob = __bf_inst_base + (uint64_t)k * __bf_inst_stride;
+    char *sc = scratch + (uint64_t)k * __bf_inst_stride;
+    const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
+    float *J = &jacOut[(uint64_t)k * 16];
+
+    memcpy(sc, blob, __bf_image_size);
+    for (int d = 0; d < 4; d++) {
+        float rc[4], mp[4], mm[4];
+        for (int i = 0; i < 4; i++) {
+            rc[i] = 1500.0f + 500.0f * a[i];
+        }
+        rc[d] += 500.0f * eps;
+        bflRateCore(rc);
+        bflGetMotorsRaw(mp, 4);
+        memcpy(blob, sc, __bf_image_size);
+        for (int i = 0; i < 4; i++) {
+            rc[i] = 1500.0f + 500.0f * a[i];
+        }
+        rc[d] -= 500.0f * eps;
+        bflRateCore(rc);
+        bflGetMotorsRaw(mm, 4);
+        memcpy(blob, sc, __bf_image_size);
+        for (int i = 0; i < 4; i++) {
+            J[i * 4 + d] = (mp[i] - mm[i]) / (2.0f * eps);
+        }
     }
 }
 
