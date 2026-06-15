@@ -1,0 +1,1625 @@
+ninja: Entering directory `enzyme_build'
+[0/2] Re-checking globbed directories...
+[1/96] Bundling includes
+
+/home/luke/Code/betaflight/tools/enzyme_build/Enzyme/Clang/bundled_includes.h
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/include/enzyme/../enzyme/tuple
+/enzymeroot//enzyme/tuple
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/include/enzyme/../enzyme/type_traits
+/enzymeroot//enzyme/type_traits
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/include/enzyme/../enzyme/utils
+/enzymeroot//enzyme/utils
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/include/enzyme/../enzyme/fprt/flops.def
+/enzymeroot//enzyme/fprt/flops.def
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/include/enzyme/../enzyme/fprt/mpfr.h
+/enzymeroot//enzyme/fprt/mpfr.h
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/include/enzyme/../enzyme/enzyme
+/enzymeroot//enzyme/enzyme
+[2/96] Building CXX object tools/enzyme-tblgen/CMakeFiles/enzyme-tblgen.dir/caching.cpp.o
+[3/96] Building CXX object tools/enzyme-tblgen/CMakeFiles/enzyme-tblgen.dir/datastructures.cpp.o
+[4/96] Building CXX object tools/enzyme-tblgen/CMakeFiles/enzyme-tblgen.dir/blas-tblgen.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/blas-tblgen.cpp: In function ‘llvm::SmallString<80> ValueType_helper(const TGPattern&, ssize_t, const llvm::DagInit*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/blas-tblgen.cpp:810:15: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘ssize_t’ {aka ‘long int’} [-Wsign-compare]
+  810 |       if (pos == actPos || actPos == -1) {
+      |           ~~~~^~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/blas-tblgen.cpp:822:69: warning: comparison of integer expressions of different signedness: ‘ssize_t’ {aka ‘long int’} and ‘size_t’ {aka ‘long unsigned int’} [-Wsign-compare]
+  822 |           (!ruleDag || hasAdjoint(pattern, ruleDag, name) || actPos == pos)
+      |                                                              ~~~~~~~^~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/blas-tblgen.cpp:826:15: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘ssize_t’ {aka ‘long int’} [-Wsign-compare]
+  826 |       if (pos == actPos || actPos == -1) {
+      |           ~~~~^~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/blas-tblgen.cpp:840:68: warning: comparison of integer expressions of different signedness: ‘ssize_t’ {aka ‘long int’} and ‘size_t’ {aka ‘long unsigned int’} [-Wsign-compare]
+  840 |       if (!ruleDag || hasAdjoint(pattern, ruleDag, name) || actPos == pos) {
+      |                                                             ~~~~~~~^~~~~~
+[5/96] Building CXX object tools/enzyme-tblgen/CMakeFiles/enzyme-tblgen.dir/enzyme-tblgen.cpp.o
+In file included from /usr/lib/llvm/20/include/llvm/ADT/SmallString.h:18,
+                 from /usr/lib/llvm/20/include/llvm/ADT/StringExtras.h:19,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/enzyme-tblgen.cpp:15:
+In constructor ‘constexpr llvm::StringRef::StringRef(const char*)’,
+    inlined from ‘void emitDiffUse(const llvm::RecordKeeper&, llvm::raw_ostream&, ActionType)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/enzyme-tblgen.cpp:2891:64:
+/usr/lib/llvm/20/include/llvm/ADT/StringRef.h:89:11: warning: ‘patternNames’ may be used uninitialized [-Wmaybe-uninitialized]
+   89 |         : Data(Str), Length(Str ?
+      |           ^~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/enzyme-tblgen.cpp: In function ‘void emitDiffUse(const llvm::RecordKeeper&, llvm::raw_ostream&, ActionType)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/tools/enzyme-tblgen/enzyme-tblgen.cpp:2869:15: note: ‘patternNames’ was declared here
+ 2869 |   const char *patternNames;
+      |               ^~~~~~~~~~~~
+[6/96] Linking CXX executable tools/enzyme-tblgen/enzyme-tblgen
+[7/96] Building BinopDerivatives.inc...
+[8/96] Building InstructionDerivatives.inc...
+[9/96] Building IntrinsicDerivatives.inc...
+[10/96] Building BlasAttributor.inc...
+[11/96] Building BlasTA.inc...
+[12/96] Building BlasDiffUse.inc...
+[13/96] Building BlasDerivatives.inc...
+[14/96] Building CallDerivatives.inc...
+[15/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/TypeAnalysis/TypeTree.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.cpp:36:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[16/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/JLInstSimplify.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/LibraryFuncs.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/JLInstSimplify.cpp:53:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[17/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/TraceInterface.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceInterface.cpp:29:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[18/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/TraceUtils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:18,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.h:32:
+In constructor ‘llvm::Twine::Twine(const char*)’,
+    inlined from ‘static TraceUtils* TraceUtils::FromClone(ProbProgMode, const llvm::SmallPtrSetImpl<llvm::Function*>&, const llvm::SmallPtrSetImpl<llvm::Function*>&, TraceInterface*, llvm::Function*, llvm::ValueToValueMapTy&)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:102:21:
+/usr/lib/llvm/20/include/llvm/ADT/Twine.h:274:16: warning: ‘mode_str’ may be used uninitialized [-Wmaybe-uninitialized]
+  274 |       if (Str[0] != '\0') {
+      |           ~~~~~^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp: In static member function ‘static TraceUtils* TraceUtils::FromClone(ProbProgMode, const llvm::SmallPtrSetImpl<llvm::Function*>&, const llvm::SmallPtrSetImpl<llvm::Function*>&, TraceInterface*, llvm::Function*, llvm::ValueToValueMapTy&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:87:15: note: ‘mode_str’ was declared here
+   87 |   const char *mode_str;
+      |               ^~~~~~~~
+[19/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/MustExitScalarEvolution.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/MustExitScalarEvolution.cpp:29:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[20/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/SimpleGVN.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/SimpleGVN.cpp:87:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[21/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/PreserveNVVM.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:49:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp: In function ‘bool preserveNVVM(bool, llvm::Module&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:939:19: warning: ‘val’ may be used uninitialized [-Wmaybe-uninitialized]
+  939 |       F.setLinkage((Function::LinkageTypes)val);
+      |       ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:937:15: note: ‘val’ was declared here
+  937 |       int64_t val;
+      |               ^~~
+[22/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/TypeAnalysis/RustDebugInfo.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp: In function ‘TypeTree parseDIType(llvm::DICompositeType&, llvm::Instruction&, llvm::DataLayout&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:68:63: warning: ‘T llvm::PointerUnion<PTs>::get() const [with T = llvm::ConstantInt*; PTs = {llvm::ConstantInt*, llvm::DIVariable*, llvm::DIExpression*}]’ is deprecated: Use cast instead [-Wdeprecated-declarations]
+   68 |       if (auto Count = Subrange->getCount().get<ConstantInt *>()) {
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugInfoMetadata.h:18,
+                 from /usr/lib/llvm/20/include/llvm/IR/DIBuilder.h:24,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:27:
+/usr/lib/llvm/20/include/llvm/ADT/PointerUnion.h:161:12: note: declared here
+  161 |   inline T get() const {
+      |            ^~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:32:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[23/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/TypeAnalysis/TypeAnalysisPrinter.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysisPrinter.cpp:57:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[24/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/ActivityAnalysisPrinter.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysisPrinter.cpp:52:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[25/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/TraceGenerator.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:26:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:22,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstVisitor.h:13,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.h:29:
+In constructor ‘llvm::Twine::Twine(const char*)’,
+    inlined from ‘void TraceGenerator::handleSampleCall(llvm::CallInst&, llvm::CallInst*)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:216:21:
+/usr/lib/llvm/20/include/llvm/ADT/Twine.h:274:16: warning: ‘mode_str’ may be used uninitialized [-Wmaybe-uninitialized]
+  274 |       if (Str[0] != '\0') {
+      |           ~~~~~^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp: In member function ‘void TraceGenerator::handleSampleCall(llvm::CallInst&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:203:15: note: ‘mode_str’ was declared here
+  203 |   const char *mode_str;
+      |               ^~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp: In member function ‘void TraceGenerator::handleArbitraryCall(llvm::CallInst&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:393:24: warning: ‘replacement’ may be used uninitialized [-Wmaybe-uninitialized]
+  393 |   replacement->takeName(new_call);
+      |   ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:303:16: note: ‘replacement’ was declared here
+  303 |   Instruction *replacement;
+      |                ^~~~~~~~~~~
+[26/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/InstructionBatcher.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/InstructionBatcher.h:48,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/InstructionBatcher.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[27/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/DiffeGradientUtils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.cpp:30:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[28/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/CacheUtility.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘std::pair<llvm::PHINode*, llvm::Instruction*> FindCanonicalIV(llvm::Loop*, llvm::Type*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:198:22: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  198 |       Inc->moveBefore(getFirstNonPHIOrDbg(Header));
+      |       ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:27:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘void RemoveRedundantIVs(llvm::BasicBlock*, llvm::PHINode*, llvm::Instruction*, MustExitScalarEvolution&, llvm::function_ref<void(llvm::Instruction*, llvm::Value*)>, llvm::function_ref<void(llvm::Instruction*)>)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:259:68: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  259 |         Exp.expandCodeFor(S, Tmp->getType(), Header->getFirstNonPHI());
+      |                                              ~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:286:64: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  286 |   Increment->moveAfter(CanonicalIV->getParent()->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘void CanonicalizeLatches(const llvm::Loop*, llvm::BasicBlock*, llvm::BasicBlock*, llvm::PHINode*, MustExitScalarEvolution&, CacheUtility&, llvm::Instruction*, llvm::ArrayRef<llvm::BasicBlock*>)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:400:66: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  400 |     Increment->moveAfter(CanonicalIV->getParent()->getFirstNonPHI());
+      |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In member function ‘void CacheUtility::storeInstructionInCache(LimitContext, llvm::Instruction*, llvm::AllocaInst*, llvm::MDNode*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:1489:69: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1489 |                                 ? (inst->getParent()->getFirstNonPHI())
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.h:52:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[29/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/ActivityAnalysisPrinter.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysisPrinter.cpp:52:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[30/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/CApi.cpp.o
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/IPO/Attributor.h:109,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:56:
+/usr/lib/llvm/20/include/llvm/Analysis/CFG.h:141:1: warning: multi-line comment [-Wcomment]
+  141 | ///  /   \
+      | ^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp: In function ‘void EnzymeMoveBefore(LLVMValueRef, LLVMValueRef, LLVMBuilderRef)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:1011:19: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1011 |     I1->moveBefore(I2);
+      |     ~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/AliasAnalysis.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:25:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:1147:19: warning: ‘ID’ initialized and declared ‘extern’
+ 1147 | extern "C++" char MyAttributorLegacyPass::ID = 0;
+      |                   ^~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[31/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/ActivityAnalysis.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.cpp:55:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[32/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/FixupJuliaCallingConvention.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FixupJuliaCallingConvention.cpp:2:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[33/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/ActivityAnalysis.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.cpp:55:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[34/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/CacheUtility.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘std::pair<llvm::PHINode*, llvm::Instruction*> FindCanonicalIV(llvm::Loop*, llvm::Type*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:198:22: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  198 |       Inc->moveBefore(getFirstNonPHIOrDbg(Header));
+      |       ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:27:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘void RemoveRedundantIVs(llvm::BasicBlock*, llvm::PHINode*, llvm::Instruction*, MustExitScalarEvolution&, llvm::function_ref<void(llvm::Instruction*, llvm::Value*)>, llvm::function_ref<void(llvm::Instruction*)>)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:259:68: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  259 |         Exp.expandCodeFor(S, Tmp->getType(), Header->getFirstNonPHI());
+      |                                              ~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:286:64: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  286 |   Increment->moveAfter(CanonicalIV->getParent()->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘void CanonicalizeLatches(const llvm::Loop*, llvm::BasicBlock*, llvm::BasicBlock*, llvm::PHINode*, MustExitScalarEvolution&, CacheUtility&, llvm::Instruction*, llvm::ArrayRef<llvm::BasicBlock*>)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:400:66: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  400 |     Increment->moveAfter(CanonicalIV->getParent()->getFirstNonPHI());
+      |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In member function ‘void CacheUtility::storeInstructionInCache(LimitContext, llvm::Instruction*, llvm::AllocaInst*, llvm::MDNode*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:1489:69: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1489 |                                 ? (inst->getParent()->getFirstNonPHI())
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.h:52:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[35/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/JLInstSimplify.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/LibraryFuncs.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/JLInstSimplify.cpp:53:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[36/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/InstructionBatcher.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/InstructionBatcher.h:48,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/InstructionBatcher.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[37/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/SimpleGVN.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/SimpleGVN.cpp:87:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[38/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/TraceInterface.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceInterface.cpp:29:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[39/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/TraceUtils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:18,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.h:32:
+In constructor ‘llvm::Twine::Twine(const char*)’,
+    inlined from ‘static TraceUtils* TraceUtils::FromClone(ProbProgMode, const llvm::SmallPtrSetImpl<llvm::Function*>&, const llvm::SmallPtrSetImpl<llvm::Function*>&, TraceInterface*, llvm::Function*, llvm::ValueToValueMapTy&)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:102:21:
+/usr/lib/llvm/20/include/llvm/ADT/Twine.h:274:16: warning: ‘mode_str’ may be used uninitialized [-Wmaybe-uninitialized]
+  274 |       if (Str[0] != '\0') {
+      |           ~~~~~^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp: In static member function ‘static TraceUtils* TraceUtils::FromClone(ProbProgMode, const llvm::SmallPtrSetImpl<llvm::Function*>&, const llvm::SmallPtrSetImpl<llvm::Function*>&, TraceInterface*, llvm::Function*, llvm::ValueToValueMapTy&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:87:15: note: ‘mode_str’ was declared here
+   87 |   const char *mode_str;
+      |               ^~~~~~~~
+[40/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/MustExitScalarEvolution.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/MustExitScalarEvolution.cpp:29:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[41/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/Clang/EnzymePassLoader.cpp.o
+[42/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/DiffeGradientUtils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.cpp:30:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[43/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/TypeAnalysis/TypeTree.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.cpp:36:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[44/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/FixupJuliaCallingConvention.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FixupJuliaCallingConvention.cpp:2:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[45/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/PreserveNVVM.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:49:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp: In function ‘bool preserveNVVM(bool, llvm::Module&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:939:19: warning: ‘val’ may be used uninitialized [-Wmaybe-uninitialized]
+  939 |       F.setLinkage((Function::LinkageTypes)val);
+      |       ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:937:15: note: ‘val’ was declared here
+  937 |       int64_t val;
+      |               ^~~
+[46/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/CApi.cpp.o
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/IPO/Attributor.h:109,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:56:
+/usr/lib/llvm/20/include/llvm/Analysis/CFG.h:141:1: warning: multi-line comment [-Wcomment]
+  141 | ///  /   \
+      | ^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp: In function ‘void EnzymeMoveBefore(LLVMValueRef, LLVMValueRef, LLVMBuilderRef)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:1011:19: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1011 |     I1->moveBefore(I2);
+      |     ~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/AliasAnalysis.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:25:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:1147:19: warning: ‘ID’ initialized and declared ‘extern’
+ 1147 | extern "C++" char MyAttributorLegacyPass::ID = 0;
+      |                   ^~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[47/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/TraceGenerator.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:26:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:22,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstVisitor.h:13,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.h:29:
+In constructor ‘llvm::Twine::Twine(const char*)’,
+    inlined from ‘void TraceGenerator::handleSampleCall(llvm::CallInst&, llvm::CallInst*)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:216:21:
+/usr/lib/llvm/20/include/llvm/ADT/Twine.h:274:16: warning: ‘mode_str’ may be used uninitialized [-Wmaybe-uninitialized]
+  274 |       if (Str[0] != '\0') {
+      |           ~~~~~^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp: In member function ‘void TraceGenerator::handleSampleCall(llvm::CallInst&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:203:15: note: ‘mode_str’ was declared here
+  203 |   const char *mode_str;
+      |               ^~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp: In member function ‘void TraceGenerator::handleArbitraryCall(llvm::CallInst&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:393:24: warning: ‘replacement’ may be used uninitialized [-Wmaybe-uninitialized]
+  393 |   replacement->takeName(new_call);
+      |   ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:303:16: note: ‘replacement’ was declared here
+  303 |   Instruction *replacement;
+      |                ^~~~~~~~~~~
+[48/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/Utils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.cpp:25:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[49/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/Enzyme.cpp.o
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/IPO/Attributor.h:109,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:89:
+/usr/lib/llvm/20/include/llvm/Analysis/CFG.h:141:1: warning: multi-line comment [-Wcomment]
+  141 | ///  /   \
+      | ^
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/Scalar/JumpThreading.h:22,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:3124:
+/usr/lib/llvm/20/include/llvm/Analysis/BranchProbabilityInfo.h:84:1: warning: multi-line comment [-Wcomment]
+   84 | ///         /   \
+      | ^
+/usr/lib/llvm/20/include/llvm/Analysis/BranchProbabilityInfo.h:87:1: warning: multi-line comment [-Wcomment]
+   87 | ///     /   \
+      | ^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In function ‘bool {anonymous}::ReplaceOriginalCall(llvm::IRBuilder<>&, llvm::Value*, llvm::Type*, llvm::Value*, llvm::Instruction*, DerivativeMode)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:350:69: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  350 |     IRBuilder<> EB(CI->getFunction()->getEntryBlock().getFirstNonPHI());
+      |                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:31:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In static member function ‘static std::optional<{anonymous}::EnzymeBase::Options> {anonymous}::EnzymeBase::handleArguments(llvm::IRBuilder<>&, llvm::CallInst*, llvm::Function*, DerivativeMode, bool, std::vector<DIFFE_TYPE>&, llvm::SmallVectorImpl<llvm::Value*>&, std::map<int, llvm::Type*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:621:30: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  621 |         primalA->insertBefore(CI);
+      |         ~~~~~~~~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::HandleProbProg(llvm::CallInst*, ProbProgMode, llvm::SmallVectorImpl<llvm::CallInst*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1896:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1896 |     IRBuilder<> AllocaBuilder(CI->getParent()->getFirstNonPHI());
+      |                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::lowerEnzymeCalls(llvm::Function&, std::set<llvm::Function*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2087:55: warning: ‘llvm::InsertPosition::InsertPosition(llvm::Instruction*)’ is deprecated: Use BasicBlock::iterators for insertion instead [-Wdeprecated-declarations]
+ 2087 |                              CallArgs, OpBundles, "", II);
+      |                                                       ^~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:57:3: note: declared here
+   57 |   InsertPosition(Instruction *InsertBefore);
+      |   ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2095:49: warning: ‘llvm::InsertPosition::InsertPosition(llvm::Instruction*)’ is deprecated: Use BasicBlock::iterators for insertion instead [-Wdeprecated-declarations]
+ 2095 |         BranchInst::Create(II->getNormalDest(), II);
+      |                                                 ^~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:57:3: note: declared here
+   57 |   InsertPosition(Instruction *InsertBefore);
+      |   ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2509:33: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 2509 |             cloned->insertBefore(B1);
+      |             ~~~~~~~~~~~~~~~~~~~~^~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2513:27: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 2513 |             CI->moveBefore(B2);
+      |             ~~~~~~~~~~~~~~^~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2516:49: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2516 |               IRBuilder<> P(post->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:76:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/g++-v16/map:65,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:58:
+In member function ‘std::map<_Key, _Tp, _Compare, _Alloc>::const_iterator std::map<_Key, _Tp, _Compare, _Alloc>::find(const key_type&) const [with _Key = AugmentedStruct; _Tp = int; _Compare = std::less<AugmentedStruct>; _Alloc = std::allocator<std::pair<const AugmentedStruct, int> >]’,
+    inlined from ‘bool {anonymous}::EnzymeBase::HandleAutoDiff(llvm::Instruction*, llvm::CallingConv::ID, llvm::Value*, llvm::Type*, llvm::SmallVectorImpl<llvm::Value*>&, const std::map<int, llvm::Type*>&, const std::vector<DIFFE_TYPE>&, llvm::Function*, DerivativeMode, Options&, bool, llvm::SmallVectorImpl<llvm::CallInst*>&)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1744:28:
+/usr/lib/gcc/x86_64-pc-linux-gnu/16/include/g++-v16/bits/stl_map.h:1440:25: warning: ‘aug’ may be used uninitialized [-Wmaybe-uninitialized]
+ 1440 |       { return _M_t.find(__x); }
+      |                ~~~~~~~~~^~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::HandleAutoDiff(llvm::Instruction*, llvm::CallingConv::ID, llvm::Value*, llvm::Type*, llvm::SmallVectorImpl<llvm::Value*>&, const std::map<int, llvm::Type*>&, const std::vector<DIFFE_TYPE>&, llvm::Function*, DerivativeMode, Options&, bool, llvm::SmallVectorImpl<llvm::CallInst*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1473:28: note: ‘aug’ was declared here
+ 1473 |     const AugmentedReturn *aug;
+      |                            ^~~
+[50/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/TypeAnalysis/RustDebugInfo.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp: In function ‘TypeTree parseDIType(llvm::DICompositeType&, llvm::Instruction&, llvm::DataLayout&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:68:63: warning: ‘T llvm::PointerUnion<PTs>::get() const [with T = llvm::ConstantInt*; PTs = {llvm::ConstantInt*, llvm::DIVariable*, llvm::DIExpression*}]’ is deprecated: Use cast instead [-Wdeprecated-declarations]
+   68 |       if (auto Count = Subrange->getCount().get<ConstantInt *>()) {
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugInfoMetadata.h:18,
+                 from /usr/lib/llvm/20/include/llvm/IR/DIBuilder.h:24,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:27:
+/usr/lib/llvm/20/include/llvm/ADT/PointerUnion.h:161:12: note: declared here
+  161 |   inline T get() const {
+      |            ^~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:32:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[51/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/TypeAnalysis/TypeAnalysisPrinter.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysisPrinter.cpp:57:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[52/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/DifferentialUseAnalysis.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DifferentialUseAnalysis.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DifferentialUseAnalysis.cpp:32:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[53/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/ActivityAnalysisPrinter.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysisPrinter.cpp:52:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[54/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/TypeAnalysis/TypeAnalysis.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp: In function ‘void getConstantAnalysis(llvm::Constant*, TypeAnalyzer&, std::map<llvm::Value*, TypeTree>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:858:20: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  858 |     I->insertBefore(TA.fntypeinfo.Function->getEntryBlock().getTerminator());
+      |     ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/IR/Constants.h:29,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:33:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp: In member function ‘void TypeAnalyzer::visitConstantExpr(llvm::ConstantExpr&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:1777:18: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1777 |   I->insertBefore(fntypeinfo.Function->getEntryBlock().getTerminator());
+      |   ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:54:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[55/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/Enzyme.cpp.o
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/IPO/Attributor.h:109,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:89:
+/usr/lib/llvm/20/include/llvm/Analysis/CFG.h:141:1: warning: multi-line comment [-Wcomment]
+  141 | ///  /   \
+      | ^
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/Scalar/JumpThreading.h:22,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:3124:
+/usr/lib/llvm/20/include/llvm/Analysis/BranchProbabilityInfo.h:84:1: warning: multi-line comment [-Wcomment]
+   84 | ///         /   \
+      | ^
+/usr/lib/llvm/20/include/llvm/Analysis/BranchProbabilityInfo.h:87:1: warning: multi-line comment [-Wcomment]
+   87 | ///     /   \
+      | ^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In function ‘bool {anonymous}::ReplaceOriginalCall(llvm::IRBuilder<>&, llvm::Value*, llvm::Type*, llvm::Value*, llvm::Instruction*, DerivativeMode)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:350:69: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  350 |     IRBuilder<> EB(CI->getFunction()->getEntryBlock().getFirstNonPHI());
+      |                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:31:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In static member function ‘static std::optional<{anonymous}::EnzymeBase::Options> {anonymous}::EnzymeBase::handleArguments(llvm::IRBuilder<>&, llvm::CallInst*, llvm::Function*, DerivativeMode, bool, std::vector<DIFFE_TYPE>&, llvm::SmallVectorImpl<llvm::Value*>&, std::map<int, llvm::Type*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:621:30: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  621 |         primalA->insertBefore(CI);
+      |         ~~~~~~~~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::HandleProbProg(llvm::CallInst*, ProbProgMode, llvm::SmallVectorImpl<llvm::CallInst*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1896:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1896 |     IRBuilder<> AllocaBuilder(CI->getParent()->getFirstNonPHI());
+      |                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::lowerEnzymeCalls(llvm::Function&, std::set<llvm::Function*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2087:55: warning: ‘llvm::InsertPosition::InsertPosition(llvm::Instruction*)’ is deprecated: Use BasicBlock::iterators for insertion instead [-Wdeprecated-declarations]
+ 2087 |                              CallArgs, OpBundles, "", II);
+      |                                                       ^~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:57:3: note: declared here
+   57 |   InsertPosition(Instruction *InsertBefore);
+      |   ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2095:49: warning: ‘llvm::InsertPosition::InsertPosition(llvm::Instruction*)’ is deprecated: Use BasicBlock::iterators for insertion instead [-Wdeprecated-declarations]
+ 2095 |         BranchInst::Create(II->getNormalDest(), II);
+      |                                                 ^~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:57:3: note: declared here
+   57 |   InsertPosition(Instruction *InsertBefore);
+      |   ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2509:33: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 2509 |             cloned->insertBefore(B1);
+      |             ~~~~~~~~~~~~~~~~~~~~^~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2513:27: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 2513 |             CI->moveBefore(B2);
+      |             ~~~~~~~~~~~~~~^~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2516:49: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2516 |               IRBuilder<> P(post->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:76:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/g++-v16/map:65,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:58:
+In member function ‘std::map<_Key, _Tp, _Compare, _Alloc>::const_iterator std::map<_Key, _Tp, _Compare, _Alloc>::find(const key_type&) const [with _Key = AugmentedStruct; _Tp = int; _Compare = std::less<AugmentedStruct>; _Alloc = std::allocator<std::pair<const AugmentedStruct, int> >]’,
+    inlined from ‘bool {anonymous}::EnzymeBase::HandleAutoDiff(llvm::Instruction*, llvm::CallingConv::ID, llvm::Value*, llvm::Type*, llvm::SmallVectorImpl<llvm::Value*>&, const std::map<int, llvm::Type*>&, const std::vector<DIFFE_TYPE>&, llvm::Function*, DerivativeMode, Options&, bool, llvm::SmallVectorImpl<llvm::CallInst*>&)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1744:28:
+/usr/lib/gcc/x86_64-pc-linux-gnu/16/include/g++-v16/bits/stl_map.h:1440:25: warning: ‘aug’ may be used uninitialized [-Wmaybe-uninitialized]
+ 1440 |       { return _M_t.find(__x); }
+      |                ~~~~~~~~~^~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::HandleAutoDiff(llvm::Instruction*, llvm::CallingConv::ID, llvm::Value*, llvm::Type*, llvm::SmallVectorImpl<llvm::Value*>&, const std::map<int, llvm::Type*>&, const std::vector<DIFFE_TYPE>&, llvm::Function*, DerivativeMode, Options&, bool, llvm::SmallVectorImpl<llvm::CallInst*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1473:28: note: ‘aug’ was declared here
+ 1473 |     const AugmentedReturn *aug;
+      |                            ^~~
+[56/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/DifferentialUseAnalysis.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DifferentialUseAnalysis.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DifferentialUseAnalysis.cpp:32:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[57/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/ActivityAnalysis.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.cpp:55:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[58/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/MustExitScalarEvolution.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/MustExitScalarEvolution.cpp:29:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[59/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/CacheUtility.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘std::pair<llvm::PHINode*, llvm::Instruction*> FindCanonicalIV(llvm::Loop*, llvm::Type*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:198:22: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  198 |       Inc->moveBefore(getFirstNonPHIOrDbg(Header));
+      |       ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:27:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘void RemoveRedundantIVs(llvm::BasicBlock*, llvm::PHINode*, llvm::Instruction*, MustExitScalarEvolution&, llvm::function_ref<void(llvm::Instruction*, llvm::Value*)>, llvm::function_ref<void(llvm::Instruction*)>)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:259:68: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  259 |         Exp.expandCodeFor(S, Tmp->getType(), Header->getFirstNonPHI());
+      |                                              ~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:286:64: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  286 |   Increment->moveAfter(CanonicalIV->getParent()->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In function ‘void CanonicalizeLatches(const llvm::Loop*, llvm::BasicBlock*, llvm::BasicBlock*, llvm::PHINode*, MustExitScalarEvolution&, CacheUtility&, llvm::Instruction*, llvm::ArrayRef<llvm::BasicBlock*>)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:400:66: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  400 |     Increment->moveAfter(CanonicalIV->getParent()->getFirstNonPHI());
+      |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp: In member function ‘void CacheUtility::storeInstructionInCache(LimitContext, llvm::Instruction*, llvm::AllocaInst*, llvm::MDNode*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.cpp:1489:69: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1489 |                                 ? (inst->getParent()->getFirstNonPHI())
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CacheUtility.h:52:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[60/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/JLInstSimplify.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/LibraryFuncs.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/JLInstSimplify.cpp:53:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[61/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/InstructionBatcher.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/InstructionBatcher.h:48,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/InstructionBatcher.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[62/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/DiffeGradientUtils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.cpp:30:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[63/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/Clang/EnzymeClang.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Clang/EnzymeClang.cpp:38:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Clang/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[64/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/CApi.cpp.o
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/IPO/Attributor.h:109,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:56:
+/usr/lib/llvm/20/include/llvm/Analysis/CFG.h:141:1: warning: multi-line comment [-Wcomment]
+  141 | ///  /   \
+      | ^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp: In function ‘void EnzymeMoveBefore(LLVMValueRef, LLVMValueRef, LLVMBuilderRef)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:1011:19: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1011 |     I1->moveBefore(I2);
+      |     ~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/AliasAnalysis.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:25:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CApi.cpp:1147:19: warning: ‘ID’ initialized and declared ‘extern’
+ 1147 | extern "C++" char MyAttributorLegacyPass::ID = 0;
+      |                   ^~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[65/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/Utils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.cpp:25:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[66/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/TraceInterface.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceInterface.cpp:29:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[67/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/Clang/EnzymePassLoader.cpp.o
+[68/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/PreserveNVVM.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:49:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp: In function ‘bool preserveNVVM(bool, llvm::Module&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:939:19: warning: ‘val’ may be used uninitialized [-Wmaybe-uninitialized]
+  939 |       F.setLinkage((Function::LinkageTypes)val);
+      |       ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/PreserveNVVM.cpp:937:15: note: ‘val’ was declared here
+  937 |       int64_t val;
+      |               ^~~
+[69/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/SimpleGVN.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/SimpleGVN.cpp:87:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[70/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/FunctionUtils.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘void SimplifyMPIQueries(llvm::Function&, llvm::FunctionAnalysisManager&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:1406:59: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1406 |       B.SetInsertPoint(II->getNormalDest()->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:35,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:25:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:1422:61: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1422 |         B.SetInsertPoint(II->getNormalDest()->getFirstNonPHI());
+      |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘std::optional<std::__cxx11::basic_string<char> > fixSparse_inner(llvm::Instruction*, llvm::Function&, QueueType&, llvm::DominatorTree&, llvm::ScalarEvolution&, llvm::LoopInfo&, const llvm::DataLayout&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6440:53: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6440 |     B.SetInsertPoint(PN->getParent()->getFirstNonPHI());
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6465:53: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6465 |         auto point = PN->getParent()->getFirstNonPHI();
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6981:30: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 6981 |           (*iter)->moveBefore(br);
+      |           ~~~~~~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘void fixSparseIndices(llvm::Function&, llvm::FunctionAnalysisManager&, llvm::SetVector<llvm::BasicBlock*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:8433:51: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 8433 |       IRBuilder<> B(L->getHeader()->getFirstNonPHI());
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[71/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/TypeAnalysis/TypeTree.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.cpp:36:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[72/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/FixupJuliaCallingConvention.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FixupJuliaCallingConvention.cpp:2:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[73/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/TraceUtils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:18,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.h:32:
+In constructor ‘llvm::Twine::Twine(const char*)’,
+    inlined from ‘static TraceUtils* TraceUtils::FromClone(ProbProgMode, const llvm::SmallPtrSetImpl<llvm::Function*>&, const llvm::SmallPtrSetImpl<llvm::Function*>&, TraceInterface*, llvm::Function*, llvm::ValueToValueMapTy&)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:102:21:
+/usr/lib/llvm/20/include/llvm/ADT/Twine.h:274:16: warning: ‘mode_str’ may be used uninitialized [-Wmaybe-uninitialized]
+  274 |       if (Str[0] != '\0') {
+      |           ~~~~~^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp: In static member function ‘static TraceUtils* TraceUtils::FromClone(ProbProgMode, const llvm::SmallPtrSetImpl<llvm::Function*>&, const llvm::SmallPtrSetImpl<llvm::Function*>&, TraceInterface*, llvm::Function*, llvm::ValueToValueMapTy&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceUtils.cpp:87:15: note: ‘mode_str’ was declared here
+   87 |   const char *mode_str;
+      |               ^~~~~~~~
+[74/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/TraceGenerator.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:26:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:22,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstVisitor.h:13,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.h:29:
+In constructor ‘llvm::Twine::Twine(const char*)’,
+    inlined from ‘void TraceGenerator::handleSampleCall(llvm::CallInst&, llvm::CallInst*)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:216:21:
+/usr/lib/llvm/20/include/llvm/ADT/Twine.h:274:16: warning: ‘mode_str’ may be used uninitialized [-Wmaybe-uninitialized]
+  274 |       if (Str[0] != '\0') {
+      |           ~~~~~^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp: In member function ‘void TraceGenerator::handleSampleCall(llvm::CallInst&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:203:15: note: ‘mode_str’ was declared here
+  203 |   const char *mode_str;
+      |               ^~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp: In member function ‘void TraceGenerator::handleArbitraryCall(llvm::CallInst&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:393:24: warning: ‘replacement’ may be used uninitialized [-Wmaybe-uninitialized]
+  393 |   replacement->takeName(new_call);
+      |   ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TraceGenerator.cpp:303:16: note: ‘replacement’ was declared here
+  303 |   Instruction *replacement;
+      |                ^~~~~~~~~~~
+[75/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/TypeAnalysis/RustDebugInfo.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp: In function ‘TypeTree parseDIType(llvm::DICompositeType&, llvm::Instruction&, llvm::DataLayout&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:68:63: warning: ‘T llvm::PointerUnion<PTs>::get() const [with T = llvm::ConstantInt*; PTs = {llvm::ConstantInt*, llvm::DIVariable*, llvm::DIExpression*}]’ is deprecated: Use cast instead [-Wdeprecated-declarations]
+   68 |       if (auto Count = Subrange->getCount().get<ConstantInt *>()) {
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugInfoMetadata.h:18,
+                 from /usr/lib/llvm/20/include/llvm/IR/DIBuilder.h:24,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:27:
+/usr/lib/llvm/20/include/llvm/ADT/PointerUnion.h:161:12: note: declared here
+  161 |   inline T get() const {
+      |            ^~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeTree.h:41,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.h:33,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/RustDebugInfo.cpp:32:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[76/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/TypeAnalysis/TypeAnalysisPrinter.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysisPrinter.cpp:57:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[77/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/FunctionUtils.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘void SimplifyMPIQueries(llvm::Function&, llvm::FunctionAnalysisManager&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:1406:59: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1406 |       B.SetInsertPoint(II->getNormalDest()->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:35,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:25:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:1422:61: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1422 |         B.SetInsertPoint(II->getNormalDest()->getFirstNonPHI());
+      |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘std::optional<std::__cxx11::basic_string<char> > fixSparse_inner(llvm::Instruction*, llvm::Function&, QueueType&, llvm::DominatorTree&, llvm::ScalarEvolution&, llvm::LoopInfo&, const llvm::DataLayout&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6440:53: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6440 |     B.SetInsertPoint(PN->getParent()->getFirstNonPHI());
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6465:53: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6465 |         auto point = PN->getParent()->getFirstNonPHI();
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6981:30: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 6981 |           (*iter)->moveBefore(br);
+      |           ~~~~~~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘void fixSparseIndices(llvm::Function&, llvm::FunctionAnalysisManager&, llvm::SetVector<llvm::BasicBlock*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:8433:51: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 8433 |       IRBuilder<> B(L->getHeader()->getFirstNonPHI());
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[78/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/TypeAnalysis/TypeAnalysis.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp: In function ‘void getConstantAnalysis(llvm::Constant*, TypeAnalyzer&, std::map<llvm::Value*, TypeTree>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:858:20: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  858 |     I->insertBefore(TA.fntypeinfo.Function->getEntryBlock().getTerminator());
+      |     ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/IR/Constants.h:29,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:33:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp: In member function ‘void TypeAnalyzer::visitConstantExpr(llvm::ConstantExpr&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:1777:18: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1777 |   I->insertBefore(fntypeinfo.Function->getEntryBlock().getTerminator());
+      |   ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:54:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[79/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/Enzyme.cpp.o
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/IPO/Attributor.h:109,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:89:
+/usr/lib/llvm/20/include/llvm/Analysis/CFG.h:141:1: warning: multi-line comment [-Wcomment]
+  141 | ///  /   \
+      | ^
+In file included from /usr/lib/llvm/20/include/llvm/Transforms/Scalar/JumpThreading.h:22,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:3124:
+/usr/lib/llvm/20/include/llvm/Analysis/BranchProbabilityInfo.h:84:1: warning: multi-line comment [-Wcomment]
+   84 | ///         /   \
+      | ^
+/usr/lib/llvm/20/include/llvm/Analysis/BranchProbabilityInfo.h:87:1: warning: multi-line comment [-Wcomment]
+   87 | ///     /   \
+      | ^
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In function ‘bool {anonymous}::ReplaceOriginalCall(llvm::IRBuilder<>&, llvm::Value*, llvm::Type*, llvm::Value*, llvm::Instruction*, DerivativeMode)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:350:69: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  350 |     IRBuilder<> EB(CI->getFunction()->getEntryBlock().getFirstNonPHI());
+      |                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:31:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In static member function ‘static std::optional<{anonymous}::EnzymeBase::Options> {anonymous}::EnzymeBase::handleArguments(llvm::IRBuilder<>&, llvm::CallInst*, llvm::Function*, DerivativeMode, bool, std::vector<DIFFE_TYPE>&, llvm::SmallVectorImpl<llvm::Value*>&, std::map<int, llvm::Type*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:621:30: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  621 |         primalA->insertBefore(CI);
+      |         ~~~~~~~~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::HandleProbProg(llvm::CallInst*, ProbProgMode, llvm::SmallVectorImpl<llvm::CallInst*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1896:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1896 |     IRBuilder<> AllocaBuilder(CI->getParent()->getFirstNonPHI());
+      |                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::lowerEnzymeCalls(llvm::Function&, std::set<llvm::Function*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2087:55: warning: ‘llvm::InsertPosition::InsertPosition(llvm::Instruction*)’ is deprecated: Use BasicBlock::iterators for insertion instead [-Wdeprecated-declarations]
+ 2087 |                              CallArgs, OpBundles, "", II);
+      |                                                       ^~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:57:3: note: declared here
+   57 |   InsertPosition(Instruction *InsertBefore);
+      |   ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2095:49: warning: ‘llvm::InsertPosition::InsertPosition(llvm::Instruction*)’ is deprecated: Use BasicBlock::iterators for insertion instead [-Wdeprecated-declarations]
+ 2095 |         BranchInst::Create(II->getNormalDest(), II);
+      |                                                 ^~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:57:3: note: declared here
+   57 |   InsertPosition(Instruction *InsertBefore);
+      |   ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2509:33: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 2509 |             cloned->insertBefore(B1);
+      |             ~~~~~~~~~~~~~~~~~~~~^~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2513:27: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 2513 |             CI->moveBefore(B2);
+      |             ~~~~~~~~~~~~~~^~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:2516:49: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2516 |               IRBuilder<> P(post->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:76:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+In file included from /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/g++-v16/map:65,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:58:
+In member function ‘std::map<_Key, _Tp, _Compare, _Alloc>::const_iterator std::map<_Key, _Tp, _Compare, _Alloc>::find(const key_type&) const [with _Key = AugmentedStruct; _Tp = int; _Compare = std::less<AugmentedStruct>; _Alloc = std::allocator<std::pair<const AugmentedStruct, int> >]’,
+    inlined from ‘bool {anonymous}::EnzymeBase::HandleAutoDiff(llvm::Instruction*, llvm::CallingConv::ID, llvm::Value*, llvm::Type*, llvm::SmallVectorImpl<llvm::Value*>&, const std::map<int, llvm::Type*>&, const std::vector<DIFFE_TYPE>&, llvm::Function*, DerivativeMode, Options&, bool, llvm::SmallVectorImpl<llvm::CallInst*>&)’ at /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1744:28:
+/usr/lib/gcc/x86_64-pc-linux-gnu/16/include/g++-v16/bits/stl_map.h:1440:25: warning: ‘aug’ may be used uninitialized [-Wmaybe-uninitialized]
+ 1440 |       { return _M_t.find(__x); }
+      |                ~~~~~~~~~^~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp: In member function ‘bool {anonymous}::EnzymeBase::HandleAutoDiff(llvm::Instruction*, llvm::CallingConv::ID, llvm::Value*, llvm::Type*, llvm::SmallVectorImpl<llvm::Value*>&, const std::map<int, llvm::Type*>&, const std::vector<DIFFE_TYPE>&, llvm::Function*, DerivativeMode, Options&, bool, llvm::SmallVectorImpl<llvm::CallInst*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Enzyme.cpp:1473:28: note: ‘aug’ was declared here
+ 1473 |     const AugmentedReturn *aug;
+      |                            ^~~
+[80/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/GradientUtils.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp: In member function ‘llvm::Value* GradientUtils::getOrInsertTotalMultiplicativeProduct(llvm::Value*, LoopContext&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:487:52: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  487 |   lbuilder.SetInsertPoint(lc.header->getFirstNonPHI());
+      |                           ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:39,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:33:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp: In member function ‘llvm::Value* GradientUtils::invertPointerM(llvm::Value*, llvm::IRBuilder<>&, TypeTree)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:6471:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6471 |         IRBuilder<> postPhi(NewV->getParent()->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+[81/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/DifferentialUseAnalysis.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DifferentialUseAnalysis.h:43,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DifferentialUseAnalysis.cpp:32:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[82/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/GradientUtils.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp: In member function ‘llvm::Value* GradientUtils::getOrInsertTotalMultiplicativeProduct(llvm::Value*, LoopContext&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:487:52: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  487 |   lbuilder.SetInsertPoint(lc.header->getFirstNonPHI());
+      |                           ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:39,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:33:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp: In member function ‘llvm::Value* GradientUtils::invertPointerM(llvm::Value*, llvm::IRBuilder<>&, TypeTree)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:6471:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6471 |         IRBuilder<> postPhi(NewV->getParent()->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+[83/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/Utils.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.cpp:25:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[84/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/FunctionUtils.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘void SimplifyMPIQueries(llvm::Function&, llvm::FunctionAnalysisManager&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:1406:59: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1406 |       B.SetInsertPoint(II->getNormalDest()->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:35,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:25:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:1422:61: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1422 |         B.SetInsertPoint(II->getNormalDest()->getFirstNonPHI());
+      |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘std::optional<std::__cxx11::basic_string<char> > fixSparse_inner(llvm::Instruction*, llvm::Function&, QueueType&, llvm::DominatorTree&, llvm::ScalarEvolution&, llvm::LoopInfo&, const llvm::DataLayout&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6440:53: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6440 |     B.SetInsertPoint(PN->getParent()->getFirstNonPHI());
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6465:53: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6465 |         auto point = PN->getParent()->getFirstNonPHI();
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:6981:30: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 6981 |           (*iter)->moveBefore(br);
+      |           ~~~~~~~~~~~~~~~~~~~^~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp: In function ‘void fixSparseIndices(llvm::Function&, llvm::FunctionAnalysisManager&, llvm::SetVector<llvm::BasicBlock*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.cpp:8433:51: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 8433 |       IRBuilder<> B(L->getHeader()->getFirstNonPHI());
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/FunctionUtils.h:43:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[85/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/TypeAnalysis/TypeAnalysis.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp: In function ‘void getConstantAnalysis(llvm::Constant*, TypeAnalyzer&, std::map<llvm::Value*, TypeTree>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:858:20: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+  858 |     I->insertBefore(TA.fntypeinfo.Function->getEntryBlock().getTerminator());
+      |     ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/IR/Constants.h:29,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:33:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp: In member function ‘void TypeAnalyzer::visitConstantExpr(llvm::ConstantExpr&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:1777:18: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1777 |   I->insertBefore(fntypeinfo.Function->getEntryBlock().getTerminator());
+      |   ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../EnzymeLogic.h:47,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp:54:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+[86/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/GradientUtils.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp: In member function ‘llvm::Value* GradientUtils::getOrInsertTotalMultiplicativeProduct(llvm::Value*, LoopContext&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:487:52: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+  487 |   lbuilder.SetInsertPoint(lc.header->getFirstNonPHI());
+      |                           ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+In file included from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /usr/lib/llvm/20/include/llvm/IR/InstrTypes.h:28,
+                 from /usr/lib/llvm/20/include/llvm/IR/ConstantRange.h:35,
+                 from /usr/lib/llvm/20/include/llvm/Analysis/ScalarEvolution.h:32,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:39,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:33:
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp: In member function ‘llvm::Value* GradientUtils::invertPointerM(llvm::Value*, llvm::IRBuilder<>&, TypeTree)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.cpp:6471:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 6471 |         IRBuilder<> postPhi(NewV->getParent()->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+[87/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/EnzymeLogic.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In function ‘void cleanupInversionAllocs(DiffeGradientUtils*, llvm::BasicBlock*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:1809:23: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1809 |       inst->moveBefore(&gutils->newFunc->getEntryBlock().front());
+      |       ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:37,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:30:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In function ‘void restoreCache(DiffeGradientUtils*, const std::map<std::pair<llvm::Instruction*, CacheType>, int>&, const llvm::SmallPtrSetImpl<llvm::BasicBlock*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:1847:67: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1847 |               cast<Instruction>(newi)->getParent()->getFirstNonPHI());
+      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘const AugmentedReturn& EnzymeLogic::CreateAugmentedPrimal(RequestContext, llvm::Function*, DIFFE_TYPE, llvm::ArrayRef<DIFFE_TYPE>, TypeAnalysis&, bool, bool, const FnTypeInfo&, bool, std::vector<bool>, bool, bool, bool, unsigned int, bool, bool)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2615:71: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2615 |                   cast<Instruction>(newi)->getParent()->getFirstNonPHI());
+      |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2909:54: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2909 |   IRBuilder<> ib(NewF->getEntryBlock().getFirstNonPHI());
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2977:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2977 |           ib.SetInsertPoint(inst->getParent()->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘void TruncateUtils::createOriginalFPRTFunc(llvm::Instruction&, std::string, llvm::SmallVectorImpl<llvm::Value*>&, llvm::Type*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:5218:28: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 5218 |       ClonedI->insertBefore(Return);
+      |       ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘llvm::Function* EnzymeLogic::CreateBatch(RequestContext, llvm::Function*, unsigned int, llvm::ArrayRef<BATCH_TYPE>, BATCH_TYPE)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:5989:45: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 5989 |   IRBuilder<> Builder2(entry->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘const AugmentedReturn& EnzymeLogic::CreateAugmentedPrimal(RequestContext, llvm::Function*, DIFFE_TYPE, llvm::ArrayRef<DIFFE_TYPE>, TypeAnalysis&, bool, bool, const FnTypeInfo&, bool, std::vector<bool>, bool, bool, bool, unsigned int, bool, bool)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2981:29: warning: ‘tapeMemory’ may be used uninitialized [-Wmaybe-uninitialized]
+ 2981 |           gep = ib.CreateGEP(tapeType, tapeMemory, Idxs, "");
+      |                 ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2914:12: note: ‘tapeMemory’ was declared here
+ 2914 |     Value *tapeMemory;
+      |            ^~~~~~~~~~
+[88/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/EnzymeLogic.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In function ‘void cleanupInversionAllocs(DiffeGradientUtils*, llvm::BasicBlock*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:1809:23: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1809 |       inst->moveBefore(&gutils->newFunc->getEntryBlock().front());
+      |       ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:37,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:30:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In function ‘void restoreCache(DiffeGradientUtils*, const std::map<std::pair<llvm::Instruction*, CacheType>, int>&, const llvm::SmallPtrSetImpl<llvm::BasicBlock*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:1847:67: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1847 |               cast<Instruction>(newi)->getParent()->getFirstNonPHI());
+      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘const AugmentedReturn& EnzymeLogic::CreateAugmentedPrimal(RequestContext, llvm::Function*, DIFFE_TYPE, llvm::ArrayRef<DIFFE_TYPE>, TypeAnalysis&, bool, bool, const FnTypeInfo&, bool, std::vector<bool>, bool, bool, bool, unsigned int, bool, bool)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2615:71: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2615 |                   cast<Instruction>(newi)->getParent()->getFirstNonPHI());
+      |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2909:54: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2909 |   IRBuilder<> ib(NewF->getEntryBlock().getFirstNonPHI());
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2977:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2977 |           ib.SetInsertPoint(inst->getParent()->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘void TruncateUtils::createOriginalFPRTFunc(llvm::Instruction&, std::string, llvm::SmallVectorImpl<llvm::Value*>&, llvm::Type*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:5218:28: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 5218 |       ClonedI->insertBefore(Return);
+      |       ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘llvm::Function* EnzymeLogic::CreateBatch(RequestContext, llvm::Function*, unsigned int, llvm::ArrayRef<BATCH_TYPE>, BATCH_TYPE)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:5989:45: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 5989 |   IRBuilder<> Builder2(entry->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘const AugmentedReturn& EnzymeLogic::CreateAugmentedPrimal(RequestContext, llvm::Function*, DIFFE_TYPE, llvm::ArrayRef<DIFFE_TYPE>, TypeAnalysis&, bool, bool, const FnTypeInfo&, bool, std::vector<bool>, bool, bool, bool, unsigned int, bool, bool)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2981:29: warning: ‘tapeMemory’ may be used uninitialized [-Wmaybe-uninitialized]
+ 2981 |           gep = ib.CreateGEP(tapeType, tapeMemory, Idxs, "");
+      |                 ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2914:12: note: ‘tapeMemory’ was declared here
+ 2914 |     Value *tapeMemory;
+      |            ^~~~~~~~~~
+[89/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/EnzymeLogic.cpp.o
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In function ‘void cleanupInversionAllocs(DiffeGradientUtils*, llvm::BasicBlock*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:1809:23: warning: ‘void llvm::Instruction::moveBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 1809 |       inst->moveBefore(&gutils->newFunc->getEntryBlock().front());
+      |       ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/lib/llvm/20/include/llvm/IR/DebugProgramInstruction.h:55,
+                 from /usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:23,
+                 from /usr/lib/llvm/20/include/llvm/IR/Function.h:27,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:37,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:30:
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:244:8: note: declared here
+  244 |   void moveBefore(Instruction *MovePos);
+      |        ^~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In function ‘void restoreCache(DiffeGradientUtils*, const std::map<std::pair<llvm::Instruction*, CacheType>, int>&, const llvm::SmallPtrSetImpl<llvm::BasicBlock*>&)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:1847:67: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 1847 |               cast<Instruction>(newi)->getParent()->getFirstNonPHI());
+      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘const AugmentedReturn& EnzymeLogic::CreateAugmentedPrimal(RequestContext, llvm::Function*, DIFFE_TYPE, llvm::ArrayRef<DIFFE_TYPE>, TypeAnalysis&, bool, bool, const FnTypeInfo&, bool, std::vector<bool>, bool, bool, bool, unsigned int, bool, bool)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2615:71: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2615 |                   cast<Instruction>(newi)->getParent()->getFirstNonPHI());
+      |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2909:54: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2909 |   IRBuilder<> ib(NewF->getEntryBlock().getFirstNonPHI());
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2977:62: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 2977 |           ib.SetInsertPoint(inst->getParent()->getFirstNonPHI());
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘void TruncateUtils::createOriginalFPRTFunc(llvm::Instruction&, std::string, llvm::SmallVectorImpl<llvm::Value*>&, llvm::Type*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:5218:28: warning: ‘void llvm::Instruction::insertBefore(llvm::Instruction*)’ is deprecated: Use iterators as instruction positions [-Wdeprecated-declarations]
+ 5218 |       ClonedI->insertBefore(Return);
+      |       ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~
+/usr/lib/llvm/20/include/llvm/IR/Instruction.h:215:8: note: declared here
+  215 |   void insertBefore(Instruction *InsertPos);
+      |        ^~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘llvm::Function* EnzymeLogic::CreateBatch(RequestContext, llvm::Function*, unsigned int, llvm::ArrayRef<BATCH_TYPE>, BATCH_TYPE)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:5989:45: warning: ‘llvm::Instruction* llvm::BasicBlock::getFirstNonPHI()’ is deprecated: Use iterators as instruction positions instead [-Wdeprecated-declarations]
+ 5989 |   IRBuilder<> Builder2(entry->getFirstNonPHI());
+      |                        ~~~~~~~~~~~~~~~~~~~~~^~
+/usr/lib/llvm/20/include/llvm/IR/BasicBlock.h:290:16: note: declared here
+  290 |   Instruction *getFirstNonPHI();
+      |                ^~~~~~~~~~~~~~
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.h:47:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h: At global scope:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp: In member function ‘const AugmentedReturn& EnzymeLogic::CreateAugmentedPrimal(RequestContext, llvm::Function*, DIFFE_TYPE, llvm::ArrayRef<DIFFE_TYPE>, TypeAnalysis&, bool, bool, const FnTypeInfo&, bool, std::vector<bool>, bool, bool, bool, unsigned int, bool, bool)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2981:29: warning: ‘tapeMemory’ may be used uninitialized [-Wmaybe-uninitialized]
+ 2981 |           gep = ib.CreateGEP(tapeType, tapeMemory, Idxs, "");
+      |                 ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/EnzymeLogic.cpp:2914:12: note: ‘tapeMemory’ was declared here
+ 2914 |     Value *tapeMemory;
+      |            ^~~~~~~~~~
+[90/96] Building CXX object Enzyme/CMakeFiles/LLVMEnzyme-20.dir/CallDerivatives.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/AdjointGenerator.h:42,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp: In member function ‘bool AdjointGenerator::handleKnownCallDerivatives(llvm::CallInst&, llvm::Function*, llvm::StringRef, bool, const std::vector<bool>&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:3952:42: warning: ‘val’ may be used uninitialized [-Wmaybe-uninitialized]
+ 3952 |           Value *tofree = gutils->lookupM(val, Builder2, ValueToValueMapTy(),
+      |                           ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 3953 |                                           /*tryLegalRecompute*/ false);
+      |                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:3835:12: note: ‘val’ was declared here
+ 3835 |     Value *val;
+      |            ^~~
+[91/96] Linking CXX shared module Enzyme/LLVMEnzyme-20.so
+[92/96] Building CXX object Enzyme/CMakeFiles/ClangEnzyme-20.dir/CallDerivatives.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/AdjointGenerator.h:42,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp: In member function ‘bool AdjointGenerator::handleKnownCallDerivatives(llvm::CallInst&, llvm::Function*, llvm::StringRef, bool, const std::vector<bool>&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:3952:42: warning: ‘val’ may be used uninitialized [-Wmaybe-uninitialized]
+ 3952 |           Value *tofree = gutils->lookupM(val, Builder2, ValueToValueMapTy(),
+      |                           ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 3953 |                                           /*tryLegalRecompute*/ false);
+      |                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:3835:12: note: ‘val’ was declared here
+ 3835 |     Value *val;
+      |            ^~~
+[93/96] Linking CXX shared module Enzyme/ClangEnzyme-20.so
+[94/96] Building CXX object Enzyme/CMakeFiles/LLDEnzyme-20.dir/CallDerivatives.cpp.o
+In file included from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.h:56,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/ActivityAnalysis.h:49,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/GradientUtils.h:68,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/DiffeGradientUtils.h:31,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/AdjointGenerator.h:42,
+                 from /home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:27:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/TypeAnalysis/../Utils.h:2555:13: warning: ‘bool hasTerminator(llvm::BasicBlock*)’ defined but not used [-Wunused-function]
+ 2555 | static bool hasTerminator(llvm::BasicBlock *BB) {
+      |             ^~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp: In member function ‘bool AdjointGenerator::handleKnownCallDerivatives(llvm::CallInst&, llvm::Function*, llvm::StringRef, bool, const std::vector<bool>&, llvm::CallInst*)’:
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:3952:42: warning: ‘val’ may be used uninitialized [-Wmaybe-uninitialized]
+ 3952 |           Value *tofree = gutils->lookupM(val, Builder2, ValueToValueMapTy(),
+      |                           ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 3953 |                                           /*tryLegalRecompute*/ false);
+      |                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/luke/Code/betaflight/tools/Enzyme/enzyme/Enzyme/CallDerivatives.cpp:3835:12: note: ‘val’ was declared here
+ 3835 |     Value *val;
+      |            ^~~
+[95/96] Linking CXX shared module Enzyme/LLDEnzyme-20.so

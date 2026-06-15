@@ -20,6 +20,25 @@ HARNESS_SRCS='sitl_lockstep_main.c|sitl_lockstep_physics.c|sitl_lockstep_instanc
 GPUARCH=${GPUARCH:-sm_120}
 LIBDEVICE=/opt/cuda/nvvm/libdevice/libdevice.10.bc
 
+# Differentiable build: compile and link the whole firmware with the LLVM 20
+# slot so the Enzyme-20 autodiff plugin can run on the linked bitcode (system
+# clang is 22, unsupported by Enzyme). DIFF=0 falls back to the system
+# toolchain with no autodiff kernel.
+# DIFF=1 builds the (currently blocked) Enzyme autodiff path via LLVM 20.
+# Default 0: the finite-difference gradient kernel (bfFwStepGradFD, in
+# device_flight.c) needs no autodiff toolchain, so the normal system build
+# carries it.
+DIFF=${DIFF:-0}
+LLVMDIR=${LLVMDIR:-/usr/lib/llvm/20}
+ENZYME=${ENZYME:-tools/enzyme_build/Enzyme/LLVMEnzyme-20.so}
+if [ "$DIFF" = 1 ]; then
+    CLANG=$LLVMDIR/bin/clang; CLANGXX=$LLVMDIR/bin/clang++
+    OPT=$LLVMDIR/bin/opt; LLVMLINK=$LLVMDIR/bin/llvm-link; LLVMCONFIG=$LLVMDIR/bin/llvm-config
+    [ -f "$ENZYME" ] || { echo "Enzyme plugin not found at $ENZYME"; exit 1; }
+else
+    CLANG=clang; CLANGXX=clang++; OPT=opt; LLVMLINK=llvm-link; LLVMCONFIG=llvm-config
+fi
+
 # Device target: shim headers instead of glibc, -fno-builtin so libm/str
 # calls stay calls (resolved by device_libc/device_libm) instead of
 # becoming intrinsics the NVPTX backend can't select, RAM-backed EEPROM.
@@ -40,10 +59,12 @@ sed -E 's/uint32_t defaultBufAligned\[[^]]+\];/uint32_t defaultBufAligned[1024];
 sed -E 's/int valuesAsIndexes\[size\];/int valuesAsIndexes[64];/' \
     src/main/drivers/dshot.c > "$OUT/patched/dshot.c"
 
-if [ ! -x "$INSTANCER" ] || [ tools/lockstep_instancer/instancer.cpp -nt "$INSTANCER" ]; then
-    echo "== building instancer"
-    clang++ -O2 tools/lockstep_instancer/instancer.cpp \
-        $(llvm-config --cxxflags --ldflags --libs core irreader bitwriter support transformutils) \
+# Always rebuild: the instancer must be linked against the SAME LLVM whose
+# bitcode it rewrites (DIFF toggles between the 20 and 22 slots).
+if true; then
+    echo "== building instancer (against $("$LLVMCONFIG" --version))"
+    "$CLANGXX" -O2 tools/lockstep_instancer/instancer.cpp \
+        $("$LLVMCONFIG" --cxxflags --ldflags --libs core irreader bitwriter support transformutils) \
         -o "$INSTANCER"
 fi
 
@@ -66,11 +87,11 @@ while IFS= read -r cmd; do
     cmd=$(sed -E "s@ -ffunction-sections@@; s@ -fdata-sections@@; \
                   s@ -MMD@@; s@ -MP@@; s@ -Werror@@; \
                   s@ -c -o [^ ]+ @ -c -emit-llvm -o $bc @" <<<"$cmd")
-    cmd="clang $DEVFLAGS ${cmd#clang }"
+    cmd="$CLANG $DEVFLAGS ${cmd#clang }"
     for f in $VLA_PATCHED; do
         if [[ "$cmd" == *"$f"* ]]; then
             # quote-includes resolve relative to the original directory
-            cmd="${cmd/clang /clang -I./$(dirname "$f") }"
+            cmd="${cmd/$CLANG /$CLANG -I./$(dirname "$f") }"
             cmd=${cmd//.\/$f/$OUT/patched/$(basename "$f")}
             cmd=${cmd// $f/ $OUT/patched/$(basename "$f")}
         fi
@@ -83,27 +104,58 @@ echo "   $(wc -l < "$OUT/bc_list.txt") TUs"
 
 echo "== device glue to bitcode"
 INC="-Isrc/main -Isrc/platform/SIMULATOR -Isrc/platform/SIMULATOR/include -Isrc/platform/SIMULATOR/target/SITL_LOCKSTEP"
-clang $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/device_libc.c" -o "$OUT/device_libc.bc"
-clang $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/device_libm.c" -o "$OUT/device_libm.bc"
-clang $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/delta_gpu.c" -o "$OUT/delta_gpu.bc"
-clang $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/device_flight.c" -o "$OUT/device_flight.bc"
-clang $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm \
+"$CLANG" $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/device_libc.c" -o "$OUT/device_libc.bc"
+"$CLANG" $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/device_libm.c" -o "$OUT/device_libm.bc"
+"$CLANG" $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/delta_gpu.c" -o "$OUT/delta_gpu.bc"
+"$CLANG" $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/device_flight.c" -o "$OUT/device_flight.bc"
+# device_diff.c (the autodiff control core) is linked BEFORE the instancer
+# (see below), so Enzyme sees distinct state globals. -O1 keeps the
+# __enzyme_autodiff call and fwCore intact for the pass.
+if [ "$DIFF" = 1 ]; then
+    "$CLANG" $DEVFLAGS -O1 -ffast-math -std=gnu17 $INC -c -emit-llvm "$DEV/device_diff.c" -o "$OUT/device_diff.bc"
+fi
+"$CLANG" $DEVFLAGS -O3 -ffast-math -std=gnu17 $INC -c -emit-llvm \
     src/platform/SIMULATOR/sitl_lockstep_physics.c -o "$OUT/physics_gpu.bc"
 
-echo "== llvm-link + instancer"
-llvm-link $(cat "$OUT/bc_list.txt") -o "$OUT/fw_gpu.bc"
-"$INSTANCER" "$OUT/fw_gpu.bc" "$OUT/fw_gpu_inst.bc"
-llvm-link "$OUT/fw_gpu_inst.bc" \
+echo "== llvm-link firmware (+ diff core) "
+# Link the diff core in with the firmware TUs so Enzyme (next) sees the real
+# control functions AND the per-instance state as DISTINCT global symbols it
+# can mark inactive. Critically this is BEFORE the instancer: afterwards all
+# state is one rebased blob and Enzyme's pointer inversion crashes.
+DIFF_BC=""
+[ "$DIFF" = 1 ] && DIFF_BC="$OUT/device_diff.bc"
+"$LLVMLINK" $(cat "$OUT/bc_list.txt") $DIFF_BC -o "$OUT/fw_gpu.bc"
+
+# Enzyme autodiff pass — BEFORE the instancer. Generates the reverse-mode body
+# of bfFwStepGrad (the __enzyme_autodiff call in device_diff.c). preserve-nvvm
+# first so the __enzyme_inactive_global_* markers freeze the stateful config/
+# runtime globals (the bare "enzyme" pass does not run preserve-nvvm).
+# loose-types: assume a type for any untyped byte memcpy instead of erroring.
+INST_IN="$OUT/fw_gpu.bc"
+if [ "$DIFF" = 1 ]; then
+    echo "== Enzyme autodiff pass (pre-instancer)"
+    "$OPT" "$OUT/fw_gpu.bc" -load-pass-plugin="$ENZYME" \
+        -enzyme-loose-types -passes="preserve-nvvm,enzyme" -o "$OUT/fw_ad.bc"
+    if ! "$LLVMDIR/bin/llvm-nm" "$OUT/fw_ad.bc" 2>/dev/null | grep -q bfFwStepGrad; then
+        echo "WARNING: bfFwStepGrad missing from Enzyme output (autodiff failed)"
+    fi
+    INST_IN="$OUT/fw_ad.bc"
+fi
+
+echo "== instancer + link"
+"$INSTANCER" "$INST_IN" "$OUT/fw_gpu_inst.bc"
+"$LLVMLINK" "$OUT/fw_gpu_inst.bc" \
     "$OUT/delta_gpu.bc" "$OUT/device_flight.bc" "$OUT/physics_gpu.bc" \
     "$OUT/device_libc.bc" "$OUT/device_libm.bc" \
     --override "$LIBDEVICE" \
     -o "$OUT/whole.bc"
+AD_IN="$OUT/whole.bc"
 
 echo "== internalize + DCE + codegen"
-KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfLoadEeprom,bfOsdSnapshot,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build"
-opt -passes='internalize,globaldce' -internalize-public-api-list="$KEEP" \
-    "$OUT/whole.bc" -o "$OUT/whole_dce.bc"
-clang -target nvptx64-nvidia-cuda -march=$GPUARCH -O3 -x ir "$OUT/whole_dce.bc" -S -o "$OUT/fw.ptx"
+KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfFwStepGradFD,bfRateEval,bfLoadEeprom,bfOsdSnapshot,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build"
+"$OPT" -passes='internalize,globaldce' -internalize-public-api-list="$KEEP" \
+    "$AD_IN" -o "$OUT/whole_dce.bc"
+"$CLANG" -target nvptx64-nvidia-cuda -march=$GPUARCH -O3 -x ir "$OUT/whole_dce.bc" -S -o "$OUT/fw.ptx"
 ptxas -arch=$GPUARCH -O3 --split-compile=0 "$OUT/fw.ptx" -o "$OUT/fw.cubin"
 echo "   $(grep -c '^\.visible \.entry\|^.visible .entry' "$OUT/fw.ptx" || true) kernels, $(wc -c < "$OUT/fw.cubin") B cubin"
 

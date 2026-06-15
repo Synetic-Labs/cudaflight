@@ -1,0 +1,1220 @@
+
+const char* include_headers[][2] = {
+{"/enzymeroot//enzyme/tuple",
+R"(
+#pragma once
+
+/////////////
+// tuple.h //
+/////////////
+
+// why reinvent the wheel and implement a tuple class?
+//  - ensure data is laid out in the same order the types are specified
+//        see: https://github.com/EnzymeAD/Enzyme/issues/1191#issuecomment-1556239213
+//  - CUDA compatibility: std::tuple has some compatibility issues when used
+//        in a __device__ context (this may get better in c++20 with the improved
+//        constexpr support for std::tuple). Owning the implementation lets
+//        us add __host__ __device__ annotations to any part of it
+
+#include <cstddef> // for std::size_t
+#include <utility> // for std::integer_sequence
+
+#include <enzyme/type_traits>
+
+#define _NOEXCEPT noexcept
+namespace enzyme {
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-braces"
+
+template <int i>
+struct Index {};
+
+template <int i, typename T>
+struct value_at_position {
+  __attribute__((always_inline))
+  T & operator[](Index<i>) { return value; }
+
+  __attribute__((always_inline))
+  constexpr const T & operator[](Index<i>) const { return value; }
+  T value;
+};
+
+template <typename S, typename... T>
+struct tuple_base;
+
+template <int... i, typename... T>
+struct tuple_base<std::integer_sequence<int, i...>, T...>
+    : public value_at_position<i, T>... {
+    using value_at_position<i, T>::operator[]...;
+};
+
+template <typename... T>
+struct tuple : public tuple_base<std::make_integer_sequence<int, sizeof...(T)>, T...> {};
+
+template <typename... T>
+__attribute__((always_inline))
+tuple(T ...) -> tuple<T...>;
+
+template < int i, typename Tuple >
+__attribute__((always_inline))
+decltype(auto) get(Tuple && tup) {
+  constexpr bool is_lvalue = std::is_lvalue_reference_v<Tuple>;
+  constexpr bool is_const = std::is_const_v<std::remove_reference_t<Tuple>>;
+  using T = remove_cvref_t< decltype(tup[Index<i>{ } ]) >;
+  if constexpr ( is_lvalue &&  is_const) { return static_cast<const T&>(tup[Index<i>{} ]); }
+  if constexpr ( is_lvalue && !is_const) { return static_cast<T&>(tup[Index<i>{} ]); }
+  if constexpr (!is_lvalue &&  is_const) { return static_cast<const T&&>(tup[Index<i>{} ]); }
+  if constexpr (!is_lvalue && !is_const) { return static_cast<T&&>(tup[Index<i>{} ]); }
+}
+
+template < int i, typename ... T>
+__attribute__((always_inline))
+decltype(auto) get(const tuple< T ... > & tup) {
+    return tup[Index<i>{} ];
+}
+
+template <typename Tuple>
+struct tuple_size;
+
+template <typename... T>
+struct tuple_size<tuple<T...>> : std::integral_constant<std::size_t, sizeof...(T)> {};
+
+template <typename Tuple>
+static constexpr std::size_t tuple_size_v = tuple_size<Tuple>::value;
+
+template <typename... T>
+__attribute__((always_inline))
+constexpr auto forward_as_tuple(T&&... args) noexcept {
+  return tuple<T&&...>{impl::forward<T>(args)...};
+}
+
+namespace impl {
+
+template <typename index_seq>
+struct make_tuple_from_fwd_tuple;
+
+template <std::size_t... indices>
+struct make_tuple_from_fwd_tuple<std::index_sequence<indices...>> {
+  template <typename FWD_TUPLE>
+  __attribute__((always_inline))
+  static constexpr auto f(FWD_TUPLE&& fwd) {
+    return tuple{get<indices>(impl::forward<FWD_TUPLE>(fwd))...};
+  }
+};
+
+template <typename FWD_INDEX_SEQ, typename TUPLE_INDEX_SEQ>
+struct concat_with_fwd_tuple;
+
+template < typename Tuple >
+using iseq = std::make_index_sequence<tuple_size_v< enzyme::remove_cvref_t< Tuple > > >;
+
+template <std::size_t... fwd_indices, std::size_t... indices>
+struct concat_with_fwd_tuple<std::index_sequence<fwd_indices...>, std::index_sequence<indices...>> {
+  template <typename FWD_TUPLE, typename TUPLE>
+  __attribute__((always_inline))
+  static constexpr auto f(FWD_TUPLE&& fwd, TUPLE&& t) {
+    return enzyme::forward_as_tuple(get<fwd_indices>(impl::forward<FWD_TUPLE>(fwd))..., get<indices>(impl::forward<TUPLE>(t))...);
+  }
+};
+
+template <typename Tuple>
+__attribute__((always_inline))
+static constexpr auto tuple_cat(Tuple&& ret) {
+  return make_tuple_from_fwd_tuple< iseq< Tuple > >::f(impl::forward< Tuple >(ret));
+}
+
+template <typename FWD_TUPLE, typename first, typename... rest>
+__attribute__((always_inline))
+static constexpr auto tuple_cat(FWD_TUPLE&& fwd, first&& t, rest&&... ts) {
+  return tuple_cat(concat_with_fwd_tuple< iseq<FWD_TUPLE>, iseq<first> >::f(impl::forward<FWD_TUPLE>(fwd), impl::forward<first>(t)), impl::forward<rest>(ts)...);
+}
+
+}  // namespace impl
+
+template <typename... Tuples>
+__attribute__((always_inline))
+constexpr auto tuple_cat(Tuples&&... tuples) {
+  return impl::tuple_cat(impl::forward<Tuples>(tuples)...);
+}
+
+#pragma clang diagnostic pop
+
+} // namespace enzyme
+#undef _NOEXCEPT
+)"
+},
+{"/enzymeroot//enzyme/type_traits",
+R"(
+#pragma once
+
+#include <type_traits>
+
+namespace enzyme {
+
+// this is already in C++20, but we reimplement it here for older C++ versions
+template < typename T >
+struct remove_cvref {
+    using type =
+        typename std::remove_reference<
+            typename std::remove_cv<
+                T
+            >::type
+        >::type;
+};
+
+template < typename T >
+using remove_cvref_t = typename remove_cvref<T>::type;
+
+namespace impl {
+  template<typename _Tp>
+    __attribute__((always_inline))
+    constexpr _Tp&&
+    forward(std::remove_reference_t<_Tp>& __t) noexcept
+    { return static_cast<_Tp&&>(__t); }
+
+  /**
+   *  @brief  Forward an rvalue.
+   *  @return The parameter cast to the specified type.
+   *
+   *  This function is used to implement "perfect forwarding".
+   */
+  template<typename _Tp>
+    __attribute__((always_inline))
+    constexpr _Tp&&
+    forward(std::remove_reference_t<_Tp>&& __t) noexcept
+    {
+      static_assert(!std::is_lvalue_reference<_Tp>::value,
+	  "enzyme::impl::forward must not be used to convert an rvalue to an lvalue");
+      return static_cast<_Tp&&>(__t);
+    }
+
+}
+
+}
+)"
+},
+{"/enzymeroot//enzyme/utils",
+R"(
+#pragma once
+
+extern int enzyme_interleave;
+
+extern int enzyme_dup;
+extern int enzyme_dupnoneed;
+extern int enzyme_out;
+extern int enzyme_const;
+
+extern int enzyme_const_return;
+extern int enzyme_active_return;
+extern int enzyme_dup_return;
+
+extern int enzyme_primal_return;
+extern int enzyme_noret;
+
+template<typename Return, typename... T>
+Return __enzyme_autodiff(T...);
+
+template<typename Return, typename... T>
+Return __enzyme_fwddiff(T...);
+
+#include <enzyme/tuple>
+
+namespace enzyme {
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-braces"
+
+    struct nodiff{};
+
+    template<bool ReturnPrimal = false>
+    struct ReverseMode {
+
+    };
+    using Reverse = ReverseMode<false>;
+    using ReverseWithPrimal = ReverseMode<true>;
+
+    struct ForwardMode {
+
+    };
+    using Forward = ForwardMode;
+
+    template < typename T >
+    struct Active{
+      static_assert(
+        !std::is_reference_v<T> && !std::is_pointer_v<T>,
+        "Reference/pointer active arguments don't make sense for AD!"
+      );
+      T value;
+      Active(const T& v) : value(v) {};
+      Active(T&& v) : value(std::move(v)) {};
+      Active(const Active<T>&) = default;
+      Active(Active<T>&&) = default;
+      operator T&() { return value; }
+    };
+
+    namespace detail {
+
+        /**
+         * @brief Helper base for all `Duplicated`-type arguments
+         *
+         * Due to essentially the same implementation, it prevents code
+         * duplication
+         */
+        template < typename T >
+        struct DupArg {
+            // Argument as regular value. Also works for pointer types
+            T value;
+            T shadow;
+            DupArg(const T& v, const T& s) : value(v), shadow(s) {};
+            DupArg(T&& v, T&& s) : value(v), shadow(s) {};
+            DupArg(const DupArg<T>&) = default;
+            DupArg(DupArg<T>&&) = default;
+        };
+
+        template < typename T >
+        struct DupArg<T&> {
+            T* value;
+            T* shadow;
+            DupArg(T& v, T& s) : value(&v), shadow(&s) {}
+            DupArg(const DupArg<T&>&) = default;
+            DupArg(DupArg<T&>&&) = default;
+        };
+
+    } // <-- namespace detail
+
+    template < typename T >
+    struct Duplicated : public detail::DupArg<T> {
+      using detail::DupArg<T>::DupArg;
+    };
+
+    template < typename T >
+    struct DuplicatedNoNeed : public detail::DupArg<T> {
+      using detail::DupArg<T>::DupArg;
+    };
+
+    template < typename T >
+    struct Const{
+      T value;
+      Const(const T& v) : value(v) {};
+      Const(T&& v) : value(std::move(v)) {};
+      Const(const Const<T>&) = default;
+      Const(Const<T>&&) = default;
+      operator T&() { return value; }
+    };
+
+    template < typename T >
+    struct Const<T&>{
+        T* value;
+        Const(T& v) : value(&v) {}
+        Const(const Const<T&>&) = default;
+        Const(Const<T&>&&) = default;
+        operator T&() { return *value; }
+    };
+
+    // CTAD available in C++17 or later
+    #if __cplusplus >= 201703L
+      template < typename T >
+      Active(T) -> Active<T>;
+
+      template < typename T >
+      Const(T) -> Const<T>;
+
+      template < typename T >
+      Duplicated(T,T) -> Duplicated<T>;
+
+      template < typename T >
+      DuplicatedNoNeed(T,T) -> DuplicatedNoNeed<T>;
+    #endif
+
+    template < typename T >
+    struct type_info {
+      static constexpr bool is_active     = false;
+      static constexpr bool is_duplicated = false;
+      using type = nodiff;
+    };
+
+    template < typename T >
+    struct type_info < Active<T> >{
+        static constexpr bool is_active     = true;
+        static constexpr bool is_duplicated = false;
+        using type = T;
+    };
+
+    template < typename T >
+    struct type_info < Duplicated<T> >{
+        static constexpr bool is_active     = false;
+        static constexpr bool is_duplicated = true;
+        using type = T;
+    };
+
+    template < typename T >
+    struct type_info < DuplicatedNoNeed<T> >{
+        static constexpr bool is_active     = false;
+        static constexpr bool is_duplicated = true;
+        using type = T;
+    };
+
+    template < typename ... T >
+    struct concatenated;
+
+    template < typename ... S, typename T, typename ... rest >
+    struct concatenated < tuple < S ... >, T, rest ... > {
+        using type = typename concatenated< tuple< S ..., T>, rest ... >::type;
+    };
+
+    template < typename T >
+    struct concatenated < T > {
+        using type = T;
+    };
+
+    // Yikes!
+    // slightly cleaner in C++20, with std::remove_cvref
+    template < typename ... T >
+    struct autodiff_return;
+
+    template < typename RetType, typename ... T >
+    struct autodiff_return<ReverseMode<false>, RetType, T...>
+    {
+        using type = tuple<typename concatenated< tuple< >,
+            typename type_info<
+                typename remove_cvref< T >::type
+            >::type ...
+        >::type>;
+    };
+
+    template < typename RetType, typename ... T >
+    struct autodiff_return<ReverseMode<true>, RetType, T...>
+    {
+        using type = tuple<
+            typename type_info<RetType>::type,
+            typename concatenated< tuple< >,
+                typename type_info<
+                    typename remove_cvref< T >::type
+                >::type ...
+            >::type
+        >;
+    };
+
+    template < typename T0, typename ... T >
+    struct autodiff_return<ForwardMode, Const<T0>, T...>
+    {
+        using type = tuple<T0>;
+    };
+
+    template < typename T0, typename ... T >
+    struct autodiff_return<ForwardMode, Duplicated<T0>, T...>
+    {
+        using type = tuple<T0, T0>;
+    };
+
+    template < typename T0, typename ... T >
+    struct autodiff_return<ForwardMode, DuplicatedNoNeed<T0>, T...>
+    {
+        using type = tuple<T0>;
+    };
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_args(const enzyme::Duplicated<T> & arg) {
+        return enzyme::tuple{enzyme_dup, arg.value, arg.shadow};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_args(const enzyme::DuplicatedNoNeed<T> & arg) {
+        return enzyme::tuple{enzyme_dupnoneed, arg.value, arg.shadow};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_args(const enzyme::Active<T> & arg) {
+        return enzyme::tuple<int, T>{enzyme_out, arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_args(const enzyme::Const<T> & arg) {
+        return enzyme::tuple{enzyme_const, arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_primals(const enzyme::Duplicated<T> & arg) {
+        return enzyme::tuple{enzyme_dup, arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_primals(const enzyme::DuplicatedNoNeed<T> & arg) {
+        return enzyme::tuple{enzyme_dupnoneed, arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_primals(const enzyme::Active<T> & arg) {
+        return enzyme::tuple<int, T>{enzyme_out, arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_primals(const enzyme::Const<T> & arg) {
+        return enzyme::tuple{enzyme_const, arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_shadows(const enzyme::Duplicated<T> & arg) {
+        return enzyme::tuple{arg.shadow};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_shadows(const enzyme::DuplicatedNoNeed<T> & arg) {
+        return enzyme::tuple{arg.shadow};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_shadows(const enzyme::Active<T> & arg) {
+        return enzyme::tuple{};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto expand_shadows(const enzyme::Const<T> & arg) {
+        return enzyme::tuple{};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto primal_args(const enzyme::Duplicated<T> & arg) {
+        return enzyme::tuple<T>{arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto primal_args(const enzyme::DuplicatedNoNeed<T> & arg) {
+        return enzyme::tuple<T>{arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto primal_args(const enzyme::Active<T> & arg) {
+        return enzyme::tuple<T>{arg.value};
+    }
+
+    template < typename T >
+    __attribute__((always_inline))
+    auto primal_args(const enzyme::Const<T> & arg) {
+        return enzyme::tuple<T>{arg.value};
+    }
+
+    template < template <typename> class Template, typename Arg >
+    Arg arg_type(const Template<Arg>&);
+
+    namespace detail {
+        template < typename RetType, typename ... T >
+        struct function_type
+        {
+            using type = RetType(T...);
+        };
+
+        template<typename function, typename prevfunc>
+        struct templated_call {
+
+        };
+
+        template<typename function, typename RT, typename ...T>
+        struct templated_call<function, RT(T...)> {
+            static RT wrap(function* __restrict__ f, T... args) {
+                return (*f)(args...);
+            }
+        };
+
+
+
+
+        template<typename T>
+        __attribute__((always_inline))
+        constexpr decltype(auto) push_return_last(T &&t);
+
+        template<typename ...T>
+        __attribute__((always_inline))
+        constexpr decltype(auto) push_return_last(tuple<tuple<T...>> &&t) {
+          return tuple<tuple<T...>>{get<0>(t)};
+        }
+
+        template<typename ...T, typename R>
+        __attribute__((always_inline))
+        constexpr decltype(auto) push_return_last(tuple<R, tuple<T...>> &&t) {
+          return tuple{get<1>(t), get<0>(t)};
+        }
+
+        template <typename Mode>
+        struct autodiff_apply {};
+
+        template <bool Mode>
+        struct autodiff_apply<ReverseMode<Mode>> {
+        template <class return_type, class Tuple, std::size_t... I, typename... ExtraArgs>
+        __attribute__((always_inline))
+        static constexpr decltype(auto) impl(void* f, int* ret_attr, Tuple&& t, std::index_sequence<I...>, ExtraArgs... args) {
+            return push_return_last(__enzyme_autodiff<return_type>(f, ret_attr, args..., enzyme::get<I>(impl::forward<Tuple>(t))...));
+        }
+        };
+
+        template <>
+        struct autodiff_apply<ForwardMode> {
+        template <class return_type, class Tuple, std::size_t... I, typename... ExtraArgs>
+        __attribute__((always_inline))
+        static constexpr return_type impl(void* f, int* ret_attr, Tuple&& t, std::index_sequence<I...>, ExtraArgs... args) {
+            return __enzyme_fwddiff<return_type>(f, ret_attr, args..., enzyme::get<I>(impl::forward<Tuple>(t))...);
+        }
+        };
+
+        template <typename function, class Tuple, std::size_t... I>
+        __attribute__((always_inline))
+        constexpr decltype(auto) primal_apply_impl(function &&f, Tuple&& t, std::index_sequence<I...>) {
+            return f(enzyme::get<I>(impl::forward<Tuple>(t))...);
+        }
+
+        template < typename Mode, typename T >
+        struct default_ret_activity {
+          using type = Const<T>;
+        };
+
+        template <bool prim>
+        struct default_ret_activity<ReverseMode<prim>, float> {
+          using type = Active<float>;
+        };
+
+        template <bool prim>
+        struct default_ret_activity<ReverseMode<prim>, double> {
+          using type = Active<double>;
+        };
+
+        template<>
+        struct default_ret_activity<ForwardMode, float> {
+          using type = DuplicatedNoNeed<float>;
+        };
+
+        template<>
+        struct default_ret_activity<ForwardMode, double> {
+          using type = DuplicatedNoNeed<double>;
+        };
+
+        template < typename T >
+        struct ret_global;
+
+        template<typename T>
+        struct ret_global<Const<T>> {
+          static constexpr int* value = &enzyme_const_return;
+        };
+
+        template<typename T>
+        struct ret_global<Active<T>> {
+          static constexpr int* value = &enzyme_active_return;
+        };
+
+        template<typename T>
+        struct ret_global<Duplicated<T>> {
+          static constexpr int* value = &enzyme_dup_return;
+        };
+
+        template<typename T>
+        struct ret_global<DuplicatedNoNeed<T>> {
+          static constexpr int* value = &enzyme_dup_return;
+        };
+
+        template<typename Mode, typename RetAct>
+        struct ret_used;
+
+        template<typename RetAct>
+        struct ret_used<ReverseMode<true>, RetAct> {
+          static constexpr int* value = &enzyme_primal_return;
+        };
+
+        template<typename RetAct>
+        struct ret_used<ReverseMode<false>, RetAct> {
+          static constexpr int* value = &enzyme_noret;
+        };
+
+        template<typename T>
+        struct ret_used<ForwardMode, DuplicatedNoNeed<T>> {
+          static constexpr int* value = &enzyme_noret;
+        };
+        template<typename T>
+        struct ret_used<ForwardMode, Const<T>> {
+          static constexpr int* value = &enzyme_primal_return;
+        };
+        template<typename T>
+        struct ret_used<ForwardMode, Duplicated<T>> {
+          static constexpr int* value = &enzyme_primal_return;
+        };
+
+        template <typename T, typename... Args>
+        struct verify_dup_args {
+          static constexpr bool value = true;
+        };
+
+        template <typename... Args>
+        struct verify_dup_args<enzyme::Reverse, Args...> {
+          static constexpr bool value = (
+            (
+              !type_info<Args>::is_duplicated
+              || std::is_reference_v<typename type_info<Args>::type>
+              || std::is_pointer_v<typename type_info<Args>::type>
+            ) && ...
+          );
+        };
+
+        template<class T>
+        struct is_function_or_function_ptr : std::is_function<T> {};
+         
+        template<class T>
+        struct is_function_or_function_ptr<T*> : std::is_function<T> {};
+    }  // namespace detail
+
+    template < typename return_type, typename function, typename ... enz_arg_types >
+    __attribute__((always_inline))
+    auto primal_impl(function && f, enzyme::tuple< enz_arg_types ... > && arg_tup) {
+      using Tuple = enzyme::tuple< enz_arg_types ... >;
+      return detail::primal_apply_impl<return_type>(std::move(f), impl::forward<Tuple>(arg_tup), std::make_index_sequence<enzyme::tuple_size_v<Tuple>>{});
+    }
+
+    template < typename function, typename ... arg_types>
+    auto primal_call(function && f, arg_types && ... args) {
+        return primal_impl<function>(impl::forward<function>(f), enzyme::tuple_cat(primal_args(args)...));
+    }
+
+    template < typename return_type, typename DiffMode, typename function, typename functy, typename RetActivity, typename ... enz_arg_types, std::enable_if_t<!detail::is_function_or_function_ptr<typename remove_cvref< function >::type>::value, int> = 0>
+    __attribute__((always_inline))
+    auto autodiff_impl(function && f, enzyme::tuple< enz_arg_types ... > && arg_tup) {
+      using Tuple = enzyme::tuple< enz_arg_types ... >;
+      return detail::autodiff_apply<DiffMode>::template impl<return_type>((void*)&detail::templated_call<function, functy>::wrap, detail::ret_global<RetActivity>::value,
+            impl::forward<Tuple>(arg_tup),
+            std::make_index_sequence<enzyme::tuple_size_v<Tuple>>{}, &enzyme_const, &f);
+    }
+
+    template < typename return_type, typename DiffMode, typename function, typename functy, typename RetActivity, typename ... enz_arg_types, std::enable_if_t<detail::is_function_or_function_ptr<typename remove_cvref< function >::type>::value, int> = 0>
+    __attribute__((always_inline))
+    auto autodiff_impl(function && f, enzyme::tuple< enz_arg_types ... > && arg_tup) {
+      using Tuple = enzyme::tuple< enz_arg_types ... >;
+      return detail::autodiff_apply<DiffMode>::template impl<return_type>((void*)static_cast<functy*>(f), detail::ret_global<RetActivity>::value, impl::forward<Tuple>(arg_tup), std::make_index_sequence<enzyme::tuple_size_v<Tuple>>{});
+    }
+
+    template < typename DiffMode, typename RetActivity, typename function, typename ... arg_types>
+    __attribute__((always_inline))
+    auto autodiff(function && f, arg_types && ... args) {
+        static_assert(
+            detail::verify_dup_args<DiffMode, arg_types...>::value,
+            "Non-reference/pointer Duplicated/DuplicatedNoNeed args don't make "
+            "sense for Reverse mode AD"
+        );
+        using primal_return_type = decltype(f(arg_type(args)...));
+        using functy = typename detail::function_type<primal_return_type, decltype(arg_type(args))...>::type;
+        using return_type = typename autodiff_return<DiffMode, RetActivity, arg_types...>::type;
+        return autodiff_impl<return_type, DiffMode, function, functy, RetActivity>(impl::forward<function>(f), enzyme::tuple_cat(enzyme::tuple{detail::ret_used<DiffMode, RetActivity>::value}, expand_primals(args)..., enzyme::tuple{enzyme_interleave}, expand_shadows(args)...));
+    }
+
+    template < typename DiffMode, typename function, typename ... arg_types>
+    __attribute__((always_inline))
+    auto autodiff(function && f, arg_types && ... args) {
+        static_assert(
+            detail::verify_dup_args<DiffMode, arg_types...>::value,
+            "Non-reference/pointer Duplicated/DuplicatedNoNeed args don't make "
+            "sense for Reverse mode AD"
+        );
+        using primal_return_type = decltype(f(arg_type(args)...));
+        using functy = typename detail::function_type<primal_return_type, decltype(arg_type(args))...>::type;
+        using RetActivity = typename detail::default_ret_activity<DiffMode, primal_return_type>::type;
+        using return_type = typename autodiff_return<DiffMode, RetActivity, arg_types...>::type;
+        return autodiff_impl<return_type, DiffMode, function, functy, RetActivity>(impl::forward<function>(f), enzyme::tuple_cat(enzyme::tuple{detail::ret_used<DiffMode, RetActivity>::value}, expand_primals(args)..., enzyme::tuple{enzyme_interleave}, expand_shadows(args)...));
+    }
+#pragma clang diagnostic pop
+
+} // namespace enzyme
+)"
+},
+{"/enzymeroot//enzyme/fprt/flops.def",
+R"(
+
+#define __ENZYME_MPFR_DOUBLE_BINOP(LLVM_OP_NAME, MPFR_FUNC_NAME,               \
+                                   ROUNDING_MODE)                              \
+  __ENZYME_MPFR_BIN(binop, LLVM_OP_NAME, MPFR_FUNC_NAME, 64_52, double, d,     \
+                    double, d, double, d, ROUNDING_MODE)
+
+#define __ENZYME_MPFR_DOUBLE_BINFUNCINTR(LLVM_OP_NAME, MPFR_FUNC_NAME,         \
+                                         ROUNDING_MODE)                        \
+  __ENZYME_MPFR_BIN(intr, LLVM_OP_NAME, MPFR_FUNC_NAME, 64_52, double, d,      \
+                    double, d, double, d, ROUNDING_MODE)                       \
+  __ENZYME_MPFR_BIN(intr, llvm_##LLVM_OP_NAME##_f64, MPFR_FUNC_NAME, 64_52,    \
+                    double, d, double, d, double, d, ROUNDING_MODE)            \
+  __ENZYME_MPFR_BIN(func, LLVM_OP_NAME, MPFR_FUNC_NAME, 64_52, double, d,      \
+                    double, d, double, d, ROUNDING_MODE)                       \
+  __ENZYME_MPFR_BIN(func, __##LLVM_OP_NAME##_finite, MPFR_FUNC_NAME, 64_52,    \
+                    double, d, double, d, double, d, ROUNDING_MODE)
+
+#define __ENZYME_MPFR_DOUBLE_BINOP_DEFAULT_ROUNDING(LLVM_OP_NAME,              \
+                                                    MPFR_FUNC_NAME)            \
+  __ENZYME_MPFR_DOUBLE_BINOP(LLVM_OP_NAME, MPFR_FUNC_NAME,                     \
+                             __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)
+
+#define __ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(LLVM_OP_NAME,        \
+                                                          MPFR_FUNC_NAME)      \
+  __ENZYME_MPFR_DOUBLE_BINFUNCINTR(LLVM_OP_NAME, MPFR_FUNC_NAME,               \
+                                   __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)
+
+#define __ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(LLVM_NAME, MPFR_NAME)                \
+  __ENZYME_MPFR_SINGOP(intr, LLVM_NAME, MPFR_NAME, 64_52, double, d, double,   \
+                       d, __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)                 \
+  __ENZYME_MPFR_SINGOP(intr, llvm_##LLVM_NAME##_f64, MPFR_NAME, 64_52, double, \
+                       d, double, d, __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)      \
+  __ENZYME_MPFR_SINGOP(func, LLVM_NAME, MPFR_NAME, 64_52, double, d, double,   \
+                       d, __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)                 \
+  __ENZYME_MPFR_SINGOP(func, __##LLVM_NAME##_finite, MPFR_NAME, 64_52, double, \
+                       d, double, d, __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)      \
+  __ENZYME_MPFR_SINGOP(TYPE, LLVM_NAME, MPFR_NAME, 32_23, float, d, float, d,  \
+                       __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)                    \
+  __ENZYME_MPFR_SINGOP(intr, LLVM_NAME, MPFR_NAME, 32_23, float, d, float, d,  \
+                       __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)                    \
+  __ENZYME_MPFR_SINGOP(intr, llvm_##LLVM_NAME##_f32, MPFR_NAME, 32_23, float,  \
+                       d, float, d, __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)       \
+  __ENZYME_MPFR_SINGOP(func, LLVM_NAME, MPFR_NAME, 32_23, float, d, float, d,  \
+                       __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)
+
+#define __ENZYME_MPFR_FCMP(NAME, ORDERED, CMP)                                 \
+  __ENZYME_MPFR_FCMP_IMPL(NAME, ORDERED, CMP, 64_52, double, d,                \
+                          __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)                 \
+  __ENZYME_MPFR_FCMP_IMPL(NAME, ORDERED, CMP, 32_23, double, d,                \
+                          __ENZYME_MPFR_DEFAULT_ROUNDING_MODE)
+
+// Binary operations
+__ENZYME_MPFR_DOUBLE_BINOP_DEFAULT_ROUNDING(fmul, mul);
+__ENZYME_MPFR_DOUBLE_BINOP_DEFAULT_ROUNDING(fadd, add);
+__ENZYME_MPFR_DOUBLE_BINOP_DEFAULT_ROUNDING(fsub, sub);
+__ENZYME_MPFR_DOUBLE_BINOP_DEFAULT_ROUNDING(fdiv, div);
+__ENZYME_MPFR_DOUBLE_BINOP_DEFAULT_ROUNDING(frem, remainder);
+
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(pow, pow);
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(copysign, copysign);
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(fdim, dim);
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(remainder, remainder);
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(atan2, atan2);
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(hypot, hypot);
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(fmod, fmod);
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(maxnum, max);
+__ENZYME_MPFR_DOUBLE_BINFUNCINTR_DEFAULT_ROUNDING(minnum, min);
+
+__ENZYME_MPFR_BIN_INT(intr, llvm_powi_f64_i32, pow_si, 64_52, double, d, double,
+                      d, int32_t, __ENZYME_MPFR_DEFAULT_ROUNDING_MODE);
+
+// Unary operations
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(sqrt, sqrt);
+
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(atanh, atanh);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(acosh, acosh);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(asinh, asinh);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(atan, atan);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(acos, acos);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(asin, asin);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(tanh, tanh);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(cosh, cosh);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(sinh, sinh);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(tan, tan);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(cos, cos);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(sin, sin);
+
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(exp, exp);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(exp2, exp2);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(expm1, expm1);
+
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(log, log);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(log2, log2);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(log10, log10);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(log1p, log1p);
+
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(fabs, abs);
+
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(trunc, abs);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(round, abs);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(floor, abs);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(ceil, abs);
+
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(erf, erf);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(erfc, erfc);
+
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(cbrt, cbrt);
+
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(tgamma, gamma);
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(lgamma, lngamma);
+
+// TODO This is not accurate (I think we cast int to double)
+__ENZYME_MPFR_SINGOP_DOUBLE_FLOAT(nearbyint, rint);
+
+// Ternary operation
+__ENZYME_MPFR_FMULADD(llvm_fmuladd, 64_52, double, d, f64,
+                      __ENZYME_MPFR_DEFAULT_ROUNDING_MODE);
+__ENZYME_MPFR_FMULADD(llvm_fma, 64_52, double, d, f64,
+                      __ENZYME_MPFR_DEFAULT_ROUNDING_MODE);
+
+// Comparisons
+__ENZYME_MPFR_FCMP(oeq, 1, == 0);
+__ENZYME_MPFR_FCMP(ueq, 0, == 0);
+
+__ENZYME_MPFR_FCMP(ogt, 1, > 0);
+__ENZYME_MPFR_FCMP(ugt, 0, > 0);
+
+__ENZYME_MPFR_FCMP(oge, 1, >= 0);
+__ENZYME_MPFR_FCMP(uge, 0, >= 0);
+
+__ENZYME_MPFR_FCMP(olt, 1, < 0);
+__ENZYME_MPFR_FCMP(ult, 0, < 0);
+
+__ENZYME_MPFR_FCMP(ole, 1, <= 0);
+__ENZYME_MPFR_FCMP(ule, 0, <= 0);
+
+__ENZYME_MPFR_FCMP(one, 1, != 0);
+__ENZYME_MPFR_FCMP(une, 0, != 0);
+
+// TODO special handling needed
+// __ENZYME_MPFR_FCMP(fcmp_ord, );
+// __ENZYME_MPFR_FCMP(fcmp_uno, );
+
+// Reference:
+//   FCMP_OEQ = 1,   ///< 0 0 0 1    True if ordered and equal
+//   FCMP_OGT = 2,   ///< 0 0 1 0    True if ordered and greater than
+//   FCMP_OGE = 3,   ///< 0 0 1 1    True if ordered and greater than or equal
+//   FCMP_OLT = 4,   ///< 0 1 0 0    True if ordered and less than
+//   FCMP_OLE = 5,   ///< 0 1 0 1    True if ordered and less than or equal
+//   FCMP_ONE = 6,   ///< 0 1 1 0    True if ordered and operands are unequal
+//   FCMP_ORD = 7,   ///< 0 1 1 1    True if ordered (no nans)
+//   FCMP_UNO = 8,   ///< 1 0 0 0    True if unordered: isnan(X) | isnan(Y)
+//   FCMP_UEQ = 9,   ///< 1 0 0 1    True if unordered or equal
+//   FCMP_UGT = 10,  ///< 1 0 1 0    True if unordered or greater than
+//   FCMP_UGE = 11,  ///< 1 0 1 1    True if unordered, greater than, or equal
+//   FCMP_ULT = 12,  ///< 1 1 0 0    True if unordered or less than
+//   FCMP_ULE = 13,  ///< 1 1 0 1    True if unordered, less than, or equal
+//   FCMP_UNE = 14,  ///< 1 1 1 0    True if unordered or not equal
+)"
+},
+{"/enzymeroot//enzyme/fprt/mpfr.h",
+R"(
+//===- fprt/mpfr - MPFR wrappers ---------------------------------------===//
+//
+//                             Enzyme Project
+//
+// Part of the Enzyme Project, under the Apache License v2.0 with LLVM
+// Exceptions. See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+// If using this code in an academic setting, please cite the following:
+// @incollection{enzymeNeurips,
+// title = {Instead of Rewriting Foreign Code for Machine Learning,
+//          Automatically Synthesize Fast Gradients},
+// author = {Moses, William S. and Churavy, Valentin},
+// booktitle = {Advances in Neural Information Processing Systems 33},
+// year = {2020},
+// note = {To appear in},
+// }
+//
+//===----------------------------------------------------------------------===//
+//
+// This file contains easy to use wrappers around MPFR functions.
+//
+//===----------------------------------------------------------------------===//
+#ifndef __ENZYME_RUNTIME_ENZYME_MPFR__
+#define __ENZYME_RUNTIME_ENZYME_MPFR__
+
+#include <mpfr.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// TODO TODO TODO
+// TODO TODO TODO
+// TODO TODO TODO
+// TODO TODO TODO
+// TODO TODO TODO
+// I dont think we intercept comparisons - we most definitely should.
+// TODO TODO TODO
+// TODO TODO TODO
+// TODO TODO TODO
+// TODO TODO TODO
+// TODO TODO TODO
+
+// TODO s
+//
+// (for MPFR ver. 2.1)
+//
+// We need to set the range of the allowed exponent using `mpfr_set_emin` and
+// `mpfr_set_emax`. (This means we can also play with whether the range is
+// centered around 0 (1?) or somewhere else)
+//
+// (also these need to be mutex'ed as the exponent change is global in mpfr and
+// not float-specific) ... (mpfr seems to have thread safe mode - check if it is
+// enabled or if it is enabled by default)
+//
+// For that we need to do this check:
+//   If the user changes the exponent range, it is her/his responsibility to
+//   check that all current floating-point variables are in the new allowed
+//   range (for example using mpfr_check_range), otherwise the subsequent
+//   behavior will be undefined, in the sense of the ISO C standard.
+//
+// MPFR docs state the following:
+//   Note: Overflow handling is still experimental and currently implemented
+//   partially. If an overflow occurs internally at the wrong place, anything
+//   can happen (crash, wrong results, etc).
+//
+// Which we would like to avoid somehow.
+//
+// MPFR also has this limitation that we need to address for accurate
+// simulation:
+//   [...] subnormal numbers are not implemented.
+//
+// TODO maybe take debug info as parameter - then we can emit warnings or tie
+// operations to source location
+//
+// TODO we need to provide f32 versions, and also instrument the
+// truncation/expansion between f32/f64/etc
+
+#define __ENZYME_MPFR_ATTRIBUTES __attribute__((weak))
+#define __ENZYME_MPFR_ORIGINAL_ATTRIBUTES __attribute__((weak))
+#define __ENZYME_MPFR_DEFAULT_ROUNDING_MODE GMP_RNDN
+
+static bool __enzyme_fprt_is_mem_mode(int64_t mode) { return mode & 0b0001; }
+static bool __enzyme_fprt_is_op_mode(int64_t mode) { return mode & 0b0010; }
+
+typedef struct {
+  mpfr_t v;
+} __enzyme_fp;
+
+static double __enzyme_fprt_ptr_to_double(__enzyme_fp *p) {
+  return *((double *)(&p));
+}
+static __enzyme_fp *__enzyme_fprt_double_to_ptr(double d) {
+  return *((__enzyme_fp **)(&d));
+}
+
+__ENZYME_MPFR_ATTRIBUTES
+double __enzyme_fprt_64_52_get(double _a, int64_t exponent, int64_t significand,
+                               int64_t mode) {
+  __enzyme_fp *a = __enzyme_fprt_double_to_ptr(_a);
+  return mpfr_get_d(a->v, __ENZYME_MPFR_DEFAULT_ROUNDING_MODE);
+}
+
+__ENZYME_MPFR_ATTRIBUTES
+double __enzyme_fprt_64_52_new(double _a, int64_t exponent, int64_t significand,
+                               int64_t mode) {
+  __enzyme_fp *a = (__enzyme_fp *)malloc(sizeof(__enzyme_fp));
+  mpfr_init2(a->v, significand);
+  mpfr_set_d(a->v, _a, __ENZYME_MPFR_DEFAULT_ROUNDING_MODE);
+  return __enzyme_fprt_ptr_to_double(a);
+}
+
+__ENZYME_MPFR_ATTRIBUTES
+double __enzyme_fprt_64_52_const(double _a, int64_t exponent,
+                                 int64_t significand, int64_t mode) {
+  // TODO This should really be called only once for an appearance in the code,
+  // currently it is called every time a flop uses a constant.
+  return __enzyme_fprt_64_52_new(_a, exponent, significand, mode);
+}
+
+__ENZYME_MPFR_ATTRIBUTES
+__enzyme_fp *__enzyme_fprt_64_52_new_intermediate(int64_t exponent,
+                                                  int64_t significand,
+                                                  int64_t mode) {
+  __enzyme_fp *a = (__enzyme_fp *)malloc(sizeof(__enzyme_fp));
+  mpfr_init2(a->v, significand);
+  return a;
+}
+
+__ENZYME_MPFR_ATTRIBUTES
+void __enzyme_fprt_64_52_delete(double a, int64_t exponent, int64_t significand,
+                                int64_t mode) {
+  free(__enzyme_fprt_double_to_ptr(a));
+}
+
+#define __ENZYME_MPFR_SINGOP(OP_TYPE, LLVM_OP_NAME, MPFR_FUNC_NAME, FROM_TYPE, \
+                             RET, MPFR_GET, ARG1, MPFR_SET_ARG1,               \
+                             ROUNDING_MODE)                                    \
+  __ENZYME_MPFR_ATTRIBUTES                                                     \
+  RET __enzyme_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
+      ARG1 a, int64_t exponent, int64_t significand, int64_t mode) {           \
+    if (__enzyme_fprt_is_op_mode(mode)) {                                      \
+      mpfr_t ma, mc;                                                           \
+      mpfr_init2(ma, significand);                                             \
+      mpfr_init2(mc, significand);                                             \
+      mpfr_set_##MPFR_SET_ARG1(ma, a, ROUNDING_MODE);                          \
+      mpfr_##MPFR_FUNC_NAME(mc, ma, ROUNDING_MODE);                            \
+      RET c = mpfr_get_##MPFR_GET(mc, ROUNDING_MODE);                          \
+      mpfr_clear(ma);                                                          \
+      mpfr_clear(mc);                                                          \
+      return c;                                                                \
+    } else if (__enzyme_fprt_is_mem_mode(mode)) {                              \
+      __enzyme_fp *ma = __enzyme_fprt_double_to_ptr(a);                        \
+      __enzyme_fp *mc =                                                        \
+          __enzyme_fprt_64_52_new_intermediate(exponent, significand, mode);   \
+      mpfr_##MPFR_FUNC_NAME(mc->v, ma->v, ROUNDING_MODE);                      \
+      return __enzyme_fprt_ptr_to_double(mc);                                  \
+    } else {                                                                   \
+      abort();                                                                 \
+    }                                                                          \
+  }
+
+// TODO this is a bit sketchy if the user cast their float to int before calling
+// this. We need to detect these patterns
+#define __ENZYME_MPFR_BIN_INT(OP_TYPE, LLVM_OP_NAME, MPFR_FUNC_NAME,           \
+                              FROM_TYPE, RET, MPFR_GET, ARG1, MPFR_SET_ARG1,   \
+                              ARG2, ROUNDING_MODE)                             \
+  __ENZYME_MPFR_ATTRIBUTES                                                     \
+  RET __enzyme_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
+      ARG1 a, ARG2 b, int64_t exponent, int64_t significand, int64_t mode) {   \
+    if (__enzyme_fprt_is_op_mode(mode)) {                                      \
+      mpfr_t ma, mc;                                                           \
+      mpfr_init2(ma, significand);                                             \
+      mpfr_init2(mc, significand);                                             \
+      mpfr_set_##MPFR_SET_ARG1(ma, a, ROUNDING_MODE);                          \
+      mpfr_##MPFR_FUNC_NAME(mc, ma, b, ROUNDING_MODE);                         \
+      RET c = mpfr_get_##MPFR_GET(mc, ROUNDING_MODE);                          \
+      mpfr_clear(ma);                                                          \
+      mpfr_clear(mc);                                                          \
+      return c;                                                                \
+    } else if (__enzyme_fprt_is_mem_mode(mode)) {                              \
+      __enzyme_fp *ma = __enzyme_fprt_double_to_ptr(a);                        \
+      __enzyme_fp *mc =                                                        \
+          __enzyme_fprt_64_52_new_intermediate(exponent, significand, mode);   \
+      mpfr_##MPFR_FUNC_NAME(mc->v, ma->v, b, ROUNDING_MODE);                   \
+      return __enzyme_fprt_ptr_to_double(mc);                                  \
+    } else {                                                                   \
+      abort();                                                                 \
+    }                                                                          \
+  }
+
+#define __ENZYME_MPFR_BIN(OP_TYPE, LLVM_OP_NAME, MPFR_FUNC_NAME, FROM_TYPE,    \
+                          RET, MPFR_GET, ARG1, MPFR_SET_ARG1, ARG2,            \
+                          MPFR_SET_ARG2, ROUNDING_MODE)                        \
+  __ENZYME_MPFR_ATTRIBUTES                                                     \
+  RET __enzyme_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
+      ARG1 a, ARG2 b, int64_t exponent, int64_t significand, int64_t mode) {   \
+    if (__enzyme_fprt_is_op_mode(mode)) {                                      \
+      mpfr_t ma, mb, mc;                                                       \
+      mpfr_init2(ma, significand);                                             \
+      mpfr_init2(mb, significand);                                             \
+      mpfr_init2(mc, significand);                                             \
+      mpfr_set_##MPFR_SET_ARG1(ma, a, ROUNDING_MODE);                          \
+      mpfr_set_##MPFR_SET_ARG2(mb, b, ROUNDING_MODE);                          \
+      mpfr_##MPFR_FUNC_NAME(mc, ma, mb, ROUNDING_MODE);                        \
+      RET c = mpfr_get_##MPFR_GET(mc, ROUNDING_MODE);                          \
+      mpfr_clear(ma);                                                          \
+      mpfr_clear(mb);                                                          \
+      mpfr_clear(mc);                                                          \
+      return c;                                                                \
+    } else if (__enzyme_fprt_is_mem_mode(mode)) {                              \
+      __enzyme_fp *ma = __enzyme_fprt_double_to_ptr(a);                        \
+      __enzyme_fp *mb = __enzyme_fprt_double_to_ptr(b);                        \
+      __enzyme_fp *mc =                                                        \
+          __enzyme_fprt_64_52_new_intermediate(exponent, significand, mode);   \
+      mpfr_##MPFR_FUNC_NAME(mc->v, ma->v, mb->v, ROUNDING_MODE);               \
+      return __enzyme_fprt_ptr_to_double(mc);                                  \
+    } else {                                                                   \
+      abort();                                                                 \
+    }                                                                          \
+  }
+
+#define __ENZYME_MPFR_FMULADD(LLVM_OP_NAME, FROM_TYPE, TYPE, MPFR_TYPE,        \
+                              LLVM_TYPE, ROUNDING_MODE)                        \
+  __ENZYME_MPFR_ATTRIBUTES                                                     \
+  TYPE __enzyme_fprt_##FROM_TYPE##_intr_##LLVM_OP_NAME##_##LLVM_TYPE(          \
+      TYPE a, TYPE b, TYPE c, int64_t exponent, int64_t significand,           \
+      int64_t mode) {                                                          \
+    if (__enzyme_fprt_is_op_mode(mode)) {                                      \
+      mpfr_t ma, mb, mc, mmul, madd;                                           \
+      mpfr_init2(ma, significand);                                             \
+      mpfr_init2(mb, significand);                                             \
+      mpfr_init2(mc, significand);                                             \
+      mpfr_init2(mmul, significand);                                           \
+      mpfr_init2(madd, significand);                                           \
+      mpfr_set_##MPFR_TYPE(ma, a, ROUNDING_MODE);                              \
+      mpfr_set_##MPFR_TYPE(mb, b, ROUNDING_MODE);                              \
+      mpfr_set_##MPFR_TYPE(mc, c, ROUNDING_MODE);                              \
+      mpfr_mul(mmul, ma, mb, ROUNDING_MODE);                                   \
+      mpfr_add(madd, mmul, mc, ROUNDING_MODE);                                 \
+      TYPE res = mpfr_get_##MPFR_TYPE(madd, ROUNDING_MODE);                    \
+      mpfr_clear(ma);                                                          \
+      mpfr_clear(mb);                                                          \
+      mpfr_clear(mc);                                                          \
+      mpfr_clear(mmul);                                                        \
+      mpfr_clear(madd);                                                        \
+      return res;                                                              \
+    } else if (__enzyme_fprt_is_mem_mode(mode)) {                              \
+      __enzyme_fp *ma = __enzyme_fprt_double_to_ptr(a);                        \
+      __enzyme_fp *mb = __enzyme_fprt_double_to_ptr(b);                        \
+      __enzyme_fp *mc = __enzyme_fprt_double_to_ptr(c);                        \
+      double mmul = __enzyme_fprt_##FROM_TYPE##_binop_fmul(                    \
+          __enzyme_fprt_ptr_to_double(ma), __enzyme_fprt_ptr_to_double(mb),    \
+          exponent, significand, mode);                                        \
+      double madd = __enzyme_fprt_##FROM_TYPE##_binop_fadd(                    \
+          mmul, __enzyme_fprt_ptr_to_double(mc), exponent, significand, mode); \
+      return madd;                                                             \
+    } else {                                                                   \
+      abort();                                                                 \
+    }                                                                          \
+  }
+
+// TODO This does not currently make distinctions between ordered/unordered.
+#define __ENZYME_MPFR_FCMP_IMPL(NAME, ORDERED, CMP, FROM_TYPE, TYPE, MPFR_GET, \
+                                ROUNDING_MODE)                                 \
+  __ENZYME_MPFR_ATTRIBUTES                                                     \
+  bool __enzyme_fprt_##FROM_TYPE##_fcmp_##NAME(                                \
+      TYPE a, TYPE b, int64_t exponent, int64_t significand, int64_t mode) {   \
+    if (__enzyme_fprt_is_op_mode(mode)) {                                      \
+      mpfr_t ma, mb;                                                           \
+      mpfr_init2(ma, significand);                                             \
+      mpfr_init2(mb, significand);                                             \
+      mpfr_set_##MPFR_GET(ma, a, ROUNDING_MODE);                               \
+      mpfr_set_##MPFR_GET(mb, b, ROUNDING_MODE);                               \
+      int ret = mpfr_cmp(ma, mb);                                              \
+      mpfr_clear(ma);                                                          \
+      mpfr_clear(mb);                                                          \
+      return ret CMP;                                                          \
+    } else if (__enzyme_fprt_is_mem_mode(mode)) {                              \
+      __enzyme_fp *ma = __enzyme_fprt_double_to_ptr(a);                        \
+      __enzyme_fp *mb = __enzyme_fprt_double_to_ptr(b);                        \
+      int ret = mpfr_cmp(ma->v, mb->v);                                        \
+      return ret CMP;                                                          \
+    } else {                                                                   \
+      abort();                                                                 \
+    }                                                                          \
+  }
+
+__ENZYME_MPFR_ORIGINAL_ATTRIBUTES
+bool __enzyme_fprt_original_64_52_intr_llvm_is_fpclass_f64(double a,
+                                                           int32_t tests);
+__ENZYME_MPFR_ATTRIBUTES bool
+__enzyme_fprt_64_52_intr_llvm_is_fpclass_f64(double a, int32_t tests) {
+  return __enzyme_fprt_original_64_52_intr_llvm_is_fpclass_f64(a, tests);
+}
+
+#include "flops.def"
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // #ifndef __ENZYME_RUNTIME_ENZYME_MPFR__
+)"
+},
+{"/enzymeroot//enzyme/enzyme",
+R"(
+#ifdef __cplusplus
+#include "enzyme/utils"
+#else
+#warning "Enzyme wrapper templates only available in C++"
+#endif
+)"
+},
+};

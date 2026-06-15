@@ -366,6 +366,87 @@ KERNEL void bfFwStep(bfFlight_t *st, const float *actions, const float *sensors,
     armed[k] = bflIsArmed() ? 1 : 0;
 }
 
+// Debug/baseline: run the control core once per instance for the given action
+// and write the raw float mixer output. Mutates instance state (no restore) —
+// for sanity-checking that motors respond to the stick at all.
+KERNEL void bfRateEval(const float *actions, float *motorsOut)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
+    float rc[4];
+    for (int i = 0; i < 4; i++) {
+        rc[i] = 1500.0f + 500.0f * a[i];
+    }
+    bflRateCore(rc);
+    bflGetMotorsRaw(&motorsOut[(uint64_t)k * 4], 4);
+}
+
+// ===========================================================================
+// Finite-difference gradient of the real control law (no autodiff toolchain).
+//
+// bflRateCore() runs the REAL Betaflight stick->motor pipeline directly
+// (updateRcCommands -> processRcCommand -> pidController -> mixTable, no
+// scheduler). bfFwStepGradFD central-differences it w.r.t. the 4-dim action,
+// saving/restoring the per-instance firmware blob around each perturbed eval
+// (the same memcpy bfReset uses) so every difference starts from the current
+// frozen state — giving a clean within-step Jacobian J[i][d] = d(motor_i)/
+// d(action_d). It then returns the VJP dActions = J^T · seedMotors.
+//
+// actions:     [N x 4] in [-1,1], AETR (same stick mapping as bfFwStep).
+// seedMotors:  [N x 4] cotangent d(loss)/d(motor).
+// dActions:    [N x 4] output, d(loss)/d(action).
+// scratch:     [N x stride] device scratch for the per-instance blob save.
+// eps:         action-space perturbation (e.g. 1e-3).
+KERNEL void bfFwStepGradFD(const float *actions, const float *seedMotors,
+                           float *dActions, char *scratch, float eps)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    char *blob = __bf_inst_base + (uint64_t)k * __bf_inst_stride;
+    char *sc = scratch + (uint64_t)k * __bf_inst_stride;
+    const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
+
+    memcpy(sc, blob, __bf_image_size);   // freeze the current instance state
+
+    float jac[4][4];                      // jac[i][d] = d(motor_i)/d(action_d)
+    for (int d = 0; d < 4; d++) {
+        float rc[4], mp[4], mm[4];
+        // +eps
+        for (int i = 0; i < 4; i++) {
+            rc[i] = 1500.0f + 500.0f * a[i];
+        }
+        rc[d] += 500.0f * eps;
+        bflRateCore(rc);
+        bflGetMotorsRaw(mp, 4);
+        memcpy(blob, sc, __bf_image_size);   // restore
+        // -eps
+        for (int i = 0; i < 4; i++) {
+            rc[i] = 1500.0f + 500.0f * a[i];
+        }
+        rc[d] -= 500.0f * eps;
+        bflRateCore(rc);
+        bflGetMotorsRaw(mm, 4);
+        memcpy(blob, sc, __bf_image_size);   // restore
+        for (int i = 0; i < 4; i++) {
+            jac[i][d] = (mp[i] - mm[i]) / (2.0f * eps);
+        }
+    }
+
+    const float *seed = &seedMotors[(uint64_t)k * 4];
+    for (int d = 0; d < 4; d++) {
+        float g = 0.0f;
+        for (int i = 0; i < 4; i++) {
+            g += seed[i] * jac[i][d];
+        }
+        dActions[(uint64_t)k * BF_ACT_DIM + d] = g;
+    }
+}
+
 // OSD readback: copy every instance's character grid (and displayport
 // attributes: severity + blink) into [N x rows*cols] host-visible
 // buffers. Pure readback — the firmware draws during its own OSD task

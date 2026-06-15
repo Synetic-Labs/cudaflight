@@ -1,0 +1,37 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/luke/Code/betaflight/tools/enzyme_build/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/tools/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/tools/enzyme-tblgen/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/Enzyme/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/ActivityAnalysis/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/TypeAnalysis/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/Sparse/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/Truncate/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/ReverseMode/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/ReverseModeVector/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/ForwardError/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/ForwardMode/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/ForwardModeSplit/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/ForwardModeVector/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/BatchMode/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/ProbProg/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/JLSimplify/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Enzyme/SimpleGVN/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/CppSugar/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/ForwardMode/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/ForwardError/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/ForwardModeVector/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/ReverseMode/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/BatchMode/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/Sparse/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/Integration/Truncate/cmake_install.cmake",
+		"/home/luke/Code/betaflight/tools/enzyme_build/test/BCLoader/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

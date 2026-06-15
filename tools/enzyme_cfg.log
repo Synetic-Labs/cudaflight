@@ -1,0 +1,132 @@
+-- The C compiler identification is GNU 16.1.1
+-- The CXX compiler identification is GNU 16.1.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+LLVM_SHLIBEXT=.so
+LLVM ABS DIR /usr/lib/llvm/20/lib64/cmake/llvm
+CMAKE_PREFIX_PATH 
+-- Performing Test HAVE_FFI_CALL
+-- Performing Test HAVE_FFI_CALL - Success
+-- Found FFI: /usr/lib64/libffi.so
+-- Found ZLIB: /usr/lib64/libz.so (found version "1.3.2")
+-- Found zstd: /usr/lib64/libzstd.so
+-- Found LibXml2: /usr/lib64/libxml2.so (found version "2.15.3")
+found llvm match  dir /usr/lib/llvm/20/lib64/cmake/llvm
+found llvm lit /home/luke/Code/betaflight/tools/enzyme_build/lit
+LLVM dir /usr/lib/llvm/20/lib64/cmake/llvm
+clang dir defined /usr/lib/llvm/20/lib64/cmake/clang
+-- Linker detection: GNU ld
+clang dir /usr/lib/llvm/20/lib64/cmake/clang
+mlir dir 
+clang inc dir /usr/lib/llvm/20/include
+found Clang 1
+found MLIR 0
+LLVM_INSTALL_PREFIX: /usr/lib/llvm/20
+LLVM_INCLUDE_DIRS: /usr/lib/llvm/20/include
+found LLVM definitions -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
+found LLVM version 20
+first llvm include directory/usr/lib/llvm/20/include
+-- Looking for mpfr.h
+-- Looking for mpfr.h - found
+MPFR lib: /usr/lib64/libmpfr.so
+MPFR header: 1
+CMake Warning at /usr/lib/llvm/20/lib64/cmake/llvm/AddLLVM.cmake:2029 (message):
+  LLVM_EXTERNAL_LIT set to /home/luke/Code/betaflight/tools/enzyme_build/lit,
+  but the path does not exist.
+Call Stack (most recent call first):
+  /usr/lib/llvm/20/lib64/cmake/llvm/AddLLVM.cmake:2074 (get_llvm_lit_path)
+  /usr/lib/llvm/20/lib64/cmake/llvm/AddLLVM.cmake:2167 (add_lit_target)
+  test/ActivityAnalysis/CMakeLists.txt:2 (add_lit_testsuite)
+
+
+-- Configuring done (0.5s)
+CMake Warning (dev) at /usr/lib/llvm/20/lib64/cmake/llvm/TableGen.cmake:134 (add_custom_command):
+  Policy CMP0116 is not set: Ninja generators transform DEPFILEs from
+  add_custom_command().  Run "cmake --help-policy CMP0116" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+Call Stack (most recent call first):
+  Enzyme/CMakeLists.txt:17 (tablegen)
+  Enzyme/CMakeLists.txt:23 (enzyme_tablegen)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /usr/lib/llvm/20/lib64/cmake/llvm/TableGen.cmake:134 (add_custom_command):
+  Policy CMP0116 is not set: Ninja generators transform DEPFILEs from
+  add_custom_command().  Run "cmake --help-policy CMP0116" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+Call Stack (most recent call first):
+  Enzyme/CMakeLists.txt:17 (tablegen)
+  Enzyme/CMakeLists.txt:28 (enzyme_tablegen)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /usr/lib/llvm/20/lib64/cmake/llvm/TableGen.cmake:134 (add_custom_command):
+  Policy CMP0116 is not set: Ninja generators transform DEPFILEs from
+  add_custom_command().  Run "cmake --help-policy CMP0116" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+Call Stack (most recent call first):
+  Enzyme/CMakeLists.txt:17 (tablegen)
+  Enzyme/CMakeLists.txt:27 (enzyme_tablegen)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /usr/lib/llvm/20/lib64/cmake/llvm/TableGen.cmake:134 (add_custom_command):
+  Policy CMP0116 is not set: Ninja generators transform DEPFILEs from
+  add_custom_command().  Run "cmake --help-policy CMP0116" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+Call Stack (most recent call first):
+  Enzyme/CMakeLists.txt:17 (tablegen)
+  Enzyme/CMakeLists.txt:30 (enzyme_tablegen)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /usr/lib/llvm/20/lib64/cmake/llvm/TableGen.cmake:134 (add_custom_command):
+  Policy CMP0116 is not set: Ninja generators transform DEPFILEs from
+  add_custom_command().  Run "cmake --help-policy CMP0116" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+Call Stack (most recent call first):
+  Enzyme/CMakeLists.txt:17 (tablegen)
+  Enzyme/CMakeLists.txt:29 (enzyme_tablegen)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /usr/lib/llvm/20/lib64/cmake/llvm/TableGen.cmake:134 (add_custom_command):
+  Policy CMP0116 is not set: Ninja generators transform DEPFILEs from
+  add_custom_command().  Run "cmake --help-policy CMP0116" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+Call Stack (most recent call first):
+  Enzyme/CMakeLists.txt:17 (tablegen)
+  Enzyme/CMakeLists.txt:25 (enzyme_tablegen)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /usr/lib/llvm/20/lib64/cmake/llvm/TableGen.cmake:134 (add_custom_command):
+  Policy CMP0116 is not set: Ninja generators transform DEPFILEs from
+  add_custom_command().  Run "cmake --help-policy CMP0116" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+Call Stack (most recent call first):
+  Enzyme/CMakeLists.txt:17 (tablegen)
+  Enzyme/CMakeLists.txt:26 (enzyme_tablegen)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /usr/lib/llvm/20/lib64/cmake/llvm/TableGen.cmake:134 (add_custom_command):
+  Policy CMP0116 is not set: Ninja generators transform DEPFILEs from
+  add_custom_command().  Run "cmake --help-policy CMP0116" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+Call Stack (most recent call first):
+  Enzyme/CMakeLists.txt:17 (tablegen)
+  Enzyme/CMakeLists.txt:24 (enzyme_tablegen)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Generating done (0.0s)
+-- Build files have been written to: /home/luke/Code/betaflight/tools/enzyme_build

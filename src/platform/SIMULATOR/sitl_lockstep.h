@@ -54,6 +54,18 @@ void bflSetAttitudeQuat(float w, float x, float y, float z);
 // RC injection (1000..2000 us channel values, AETR order by default map).
 void bflSetRc(const uint16_t *channels, uint8_t channelCount);
 
+// Differentiable RC injection: float channel values written straight into
+// rcData, bypassing the uint16 quantization (for the autodiff core).
+void bflSetRcFloat(const float *channels, uint8_t channelCount);
+
+// Differentiable rate-control core: real stick->motor pipeline (no scheduler),
+// rcChannelsUs = 4 channels [1000,2000] us AETR. For the Enzyme autodiff path.
+void bflRateCore(const float *rcChannelsUs);
+
+// Raw float mixer output (motor[]), pre int16 quantization — the smooth signal
+// the finite-difference gradient reads.
+void bflGetMotorsRaw(float *out, unsigned maxCount);
+
 // Armed state of the active instance (safe for the native harness,
 // unlike reading armingFlags directly).
 bool bflIsArmed(void);

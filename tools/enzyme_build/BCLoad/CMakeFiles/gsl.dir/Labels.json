@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/CMakeFiles/gsl"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/CMakeFiles/gsl.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/CMakeFiles/gsl-complete.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/gsl/src/gsl-stamp/gsl-build.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/gsl/src/gsl-stamp/gsl-configure.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/gsl/src/gsl-stamp/gsl-download.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/gsl/src/gsl-stamp/gsl-install.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/gsl/src/gsl-stamp/gsl-mkdir.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/gsl/src/gsl-stamp/gsl-patch.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/gsl/src/gsl-stamp/gsl-test.rule"
+		},
+		{
+			"file" : "/home/luke/Code/betaflight/tools/enzyme_build/BCLoad/gsl/src/gsl-stamp/gsl-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"gsl"
+		],
+		"name" : "gsl"
+	}
+}

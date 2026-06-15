@@ -1,0 +1,1 @@
+cmd='sh;/home/luke/Code/betaflight/tools/Enzyme/enzyme/BCLoad/fixwrapblas.sh'

@@ -44,7 +44,7 @@ struct bfgym {
     CUcontext ctx;          // primary context, retained
     CUmodule mod;
     CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep, fFwStep;
-    CUfunction fOsd;
+    CUfunction fOsd, fGradFD, fRateEval;
     uint32_t n;
     unsigned grid, block;
     uint64_t imageSize, stride, stateSize, actDim, obsDim;
@@ -54,6 +54,8 @@ struct bfgym {
     CUdeviceptr hashBuf, altBuf, armedBuf;
     CUdeviceptr sensBuf, motorBuf;  // external-physics exchange: [n x 7] in, [n x 4] out
     CUdeviceptr osdBuf, osdAttrBuf; // OSD char grids: [n x rows*cols] u8 each
+    CUdeviceptr seedBuf, dactBuf;   // FD gradient: [n x 4] motor cotangent in, [n x 4] action grad out
+    CUdeviceptr gradScratch;        // [n x stride] per-instance blob save for FD restore
 };
 
 // The primary context may not be current on the calling thread (or torch
@@ -130,7 +132,8 @@ void bfgym_destroy(bfgym *g)
     for (CUdeviceptr p : { g->instBuf, g->stateBuf, g->snapBuf, g->snapStBuf,
                            g->actBuf, g->obsBuf, g->rewBuf, g->doneBuf,
                            g->hashBuf, g->altBuf, g->armedBuf,
-                           g->sensBuf, g->motorBuf, g->osdBuf, g->osdAttrBuf }) {
+                           g->sensBuf, g->motorBuf, g->osdBuf, g->osdAttrBuf,
+                           g->seedBuf, g->dactBuf, g->gradScratch }) {
         if (p) {
             cuMemFree(p);
         }
@@ -215,6 +218,9 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
         cuOk(cuMemAlloc(&g->motorBuf, 4 * 4 * n), "alloc motors") &&
         cuOk(cuMemAlloc(&g->osdBuf, g->osdRows * g->osdCols * n), "alloc osd") &&
         cuOk(cuMemAlloc(&g->osdAttrBuf, g->osdRows * g->osdCols * n), "alloc osd attrs") &&
+        cuOk(cuMemAlloc(&g->seedBuf, 4 * 4 * n), "alloc grad seed") &&
+        cuOk(cuMemAlloc(&g->dactBuf, 4 * 4 * n), "alloc grad out") &&
+        cuOk(cuMemAlloc(&g->gradScratch, g->stride * n), "alloc grad scratch") &&
         cuOk(cuMemsetD8(g->osdBuf, 0x20, g->osdRows * g->osdCols * n), "blank osd") &&
         cuOk(cuMemsetD8(g->osdAttrBuf, 0, g->osdRows * g->osdCols * n), "zero osd attrs") &&
         cuOk(cuMemsetD8(g->actBuf, 0, 4 * g->actDim * n), "zero actions") &&
@@ -249,6 +255,10 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
         bfgym_destroy(g);
         return nullptr;
     }
+    // Optional: the finite-difference gradient kernel (present when the
+    // module was built with the FD control core). Non-fatal if absent.
+    cuModuleGetFunction(&g->fGradFD, g->mod, "bfFwStepGradFD");
+    cuModuleGetFunction(&g->fRateEval, g->mod, "bfRateEval");
 
     uint32_t perturb = UINT32_MAX;
     void *initArgs[] = { &g->stateBuf, &perturb };
@@ -454,6 +464,72 @@ int bfgym_fw_step(bfgym *g, uint32_t substeps)
     void *args[] = { &g->stateBuf, &g->actBuf, &g->sensBuf, &g->motorBuf,
                      &g->armedBuf, &substeps };
     return launch(g, g->fFwStep, args);
+}
+
+// ---------------------------------------------------------------------------
+// Finite-difference gradient of the real control law. Reads the actions
+// buffer and the motor-cotangent seed buffer, writes the action gradient
+// buffer: dActions = J^T . seed, J = d(motor)/d(action) of bflRateCore at the
+// current per-instance state (state saved/restored around each perturbation).
+
+uint64_t bfgym_seed_ptr(bfgym *g) { return (uint64_t)g->seedBuf; }   // [n x 4] in
+uint64_t bfgym_dact_ptr(bfgym *g) { return (uint64_t)g->dactBuf; }   // [n x 4] out
+
+int bfgym_write_seed(bfgym *g, uint64_t src_devptr)
+{
+    CtxGuard guard(g->ctx);
+    CUTRY(cuMemcpyDtoD(g->seedBuf, (CUdeviceptr)src_devptr, 4 * 4 * g->n));
+    CUTRY(cuCtxSynchronize());
+    return 0;
+}
+
+// Run the FD gradient over the current actions/seed buffers. eps is the
+// action-space central-difference step (e.g. 1e-3).
+int bfgym_grad_fd(bfgym *g, float eps)
+{
+    CtxGuard guard(g->ctx);
+    if (!g->fGradFD) {
+        snprintf(g_err, sizeof(g_err), "module has no bfFwStepGradFD kernel");
+        return -1;
+    }
+    void *args[] = { &g->actBuf, &g->seedBuf, &g->dactBuf, &g->gradScratch, &eps };
+    return launch(g, g->fGradFD, args);
+}
+
+// Debug: run the control core once over the actions buffer, writing the raw
+// float mixer output to the motors buffer (read via bfgym_motors_ptr). Mutates
+// instance state — use bfgym_reset_all after to restore.
+int bfgym_rate_eval(bfgym *g)
+{
+    CtxGuard guard(g->ctx);
+    if (!g->fRateEval) {
+        snprintf(g_err, sizeof(g_err), "module has no bfRateEval kernel");
+        return -1;
+    }
+    void *args[] = { &g->actBuf, &g->motorBuf };
+    return launch(g, g->fRateEval, args);
+}
+
+int bfgym_motors_read_host(bfgym *g, float *dst)
+{
+    CtxGuard guard(g->ctx);
+    CUTRY(cuMemcpyDtoH(dst, g->motorBuf, 4 * 4 * g->n));
+    return 0;
+}
+
+// Host-side staging helpers (for tests / non-CUDA callers).
+int bfgym_write_seed_host(bfgym *g, const float *src)
+{
+    CtxGuard guard(g->ctx);
+    CUTRY(cuMemcpyHtoD(g->seedBuf, src, 4 * 4 * g->n));
+    return 0;
+}
+
+int bfgym_grad_read_host(bfgym *g, float *dst)
+{
+    CtxGuard guard(g->ctx);
+    CUTRY(cuMemcpyDtoH(dst, g->dactBuf, 4 * 4 * g->n));
+    return 0;
 }
 
 // ---------------------------------------------------------------------------

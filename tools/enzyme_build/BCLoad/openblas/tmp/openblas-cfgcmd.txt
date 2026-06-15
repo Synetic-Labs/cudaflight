@@ -1,0 +1,1 @@
+cmd='sh;/home/luke/Code/betaflight/tools/Enzyme/enzyme/BCLoad/fixopenblas.sh;$<TARGET_FILE:clang>'

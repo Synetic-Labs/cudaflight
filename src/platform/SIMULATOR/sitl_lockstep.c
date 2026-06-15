@@ -73,7 +73,9 @@
 #include "rx/rx.h"
 
 #include "fc/rc_modes.h"
+#include "fc/rc.h"
 #include "fc/runtime_config.h"
+#include "flight/pid.h"
 #include "sensors/gyro.h"
 #include "sensors/sensors.h"
 
@@ -283,6 +285,45 @@ void bflSetRc(const uint16_t *channels, uint8_t channelCount)
     rxUpdateUdpChannels(channels, channelCount);
 }
 
+// Differentiable RC path: write float channel values [1000;2000] straight
+// into rcData, bypassing the uint16 UDP-channel quantization that makes the
+// normal bflSetRc() path non-differentiable w.r.t. a continuous action. No
+// new-frame flag is raised, so the rx task does not overwrite rcData from the
+// (stale) UDP buffer within the step — the injected setpoint persists into
+// processRcCommand(). Used by the autodiff core; the forward/eval path still
+// uses bflSetRc().
+void bflSetRcFloat(const float *channels, uint8_t channelCount)
+{
+    const uint8_t count = channelCount < MAX_SUPPORTED_RC_CHANNEL_COUNT
+                              ? channelCount : MAX_SUPPORTED_RC_CHANNEL_COUNT;
+    for (uint8_t i = 0; i < count; i++) {
+        rcData[i] = channels[i];
+    }
+}
+
+// Differentiable rate-control core for the autodiff path. Runs the REAL
+// Betaflight stick->motor pipeline directly on the active instance — no
+// scheduler, no logging/telemetry/IO tasks — so Enzyme only ever sees the
+// control math: rcData -> (expo) rcCommand -> (rates) setpoint -> pidController
+// -> mixTable -> motor[]. The inputs (rcData) and outputs (motor[]) are plain
+// float arrays Enzyme can shadow; the stateful config/runtime globals
+// (currentPidProfile, currentControlRateProfile, pidRuntime, mixerRuntime,
+// gyro) are frozen via enzyme_inactive markers on the autodiff side, yielding
+// the within-step d(motor)/d(stick) sensitivity. rcChannelsUs: 4 RC channels
+// in [1000,2000] us, AETR order (roll, pitch, throttle, yaw).
+void bflRateCore(const float *rcChannelsUs)
+{
+    for (int i = 0; i < 4; i++) {
+        rcData[i] = rcChannelsUs[i];
+    }
+    updateRcCommands();   // rcData -> rcCommand (deadband + expo)
+    processRcCommand();   // rcCommand -> setpointRate (rates curve), needs isRxDataNew
+    const timeUs_t now = micros();
+    pidController(currentPidProfile, now);  // setpoint + gyro -> pidData
+    mixTable(now);                          // pidData -> motor[]
+    writeMotors();                          // motor[] -> motorsNormalised (read-side)
+}
+
 // ===========================================================================
 // PWM motors / servos
 // ===========================================================================
@@ -455,6 +496,17 @@ void bflGetMotorsNormalised(float *out, unsigned maxCount)
 {
     for (unsigned i = 0; i < maxCount && i < MAX_SUPPORTED_MOTORS; i++) {
         out[i] = motorsNormalised[i];
+    }
+}
+
+// Raw float mixer output (motor[]), BEFORE the int16 motorsPwm quantization
+// that bflGetMotorsNormalised goes through. The smooth signal the autodiff /
+// finite-difference gradient must read so small perturbations aren't lost to
+// integer truncation.
+void bflGetMotorsRaw(float *out, unsigned maxCount)
+{
+    for (unsigned i = 0; i < maxCount && i < MAX_SUPPORTED_MOTORS; i++) {
+        out[i] = motor[i];
     }
 }
 
