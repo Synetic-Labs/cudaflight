@@ -42,6 +42,9 @@ fi
 # Device target: shim headers instead of glibc, -fno-builtin so libm/str
 # calls stay calls (resolved by device_libc/device_libm) instead of
 # becoming intrinsics the NVPTX backend can't select, RAM-backed EEPROM.
+# (The self-relative lookup tables clang's -O2 emits are un-done later by the
+# instancer's delinearizeRelLookupTables — NVPTX can't codegen them, and LLVM
+# 20 has no flag to suppress the RelLookupTableConverter pass.)
 DEVFLAGS="-target nvptx64-nvidia-cuda -march=$GPUARCH -nostdlibinc \
  -isystem tools/lockstep_instancer/device/include -fno-builtin -DBFL_EEPROM_RAM -w"
 
@@ -133,10 +136,29 @@ DIFF_BC=""
 # loose-types: assume a type for any untyped byte memcpy instead of erroring.
 INST_IN="$OUT/fw_gpu.bc"
 if [ "$DIFF" = 1 ]; then
+    # Freeze the parameter-group config globals (*_System/_Copy/_Registry):
+    # stamp them enzyme_inactive (no shadow / zero derivative) and
+    # enzyme_ta_norecur (don't let TypeAnalysis refine their union-laden config
+    # structs). Without the latter, TA's fixpoint oscillates on those unions and
+    # never terminates (accelerometerConfig_System alone was ~40% of an
+    # overnight, unfinished run); with it the pass finishes in <1s.
+    echo "== freeze config globals (pre-Enzyme)"
+    "$LLVMDIR/bin/llvm-dis" "$OUT/fw_gpu.bc" -o - \
+        | python3 tools/lockstep_instancer/freeze_config_globals.py \
+        | "$LLVMDIR/bin/llvm-as" -o "$OUT/fw_gpu_frozen.bc"
+
     echo "== Enzyme autodiff pass (pre-instancer)"
-    "$OPT" "$OUT/fw_gpu.bc" -load-pass-plugin="$ENZYME" \
-        -enzyme-loose-types -passes="preserve-nvvm,enzyme" -o "$OUT/fw_ad.bc"
-    if ! "$LLVMDIR/bin/llvm-nm" "$OUT/fw_ad.bc" 2>/dev/null | grep -q bfFwStepGrad; then
+    # assume-unknown-nofree: device libc/libm (abs, ...) are linked AFTER Enzyme,
+    # so here they are body-less declarations; none of them free memory.
+    "$OPT" "$OUT/fw_gpu_frozen.bc" -load-pass-plugin="$ENZYME" \
+        -enzyme-loose-types -enzyme-assume-unknown-nofree=1 \
+        -passes="preserve-nvvm,enzyme" -o "$OUT/fw_ad.bc"
+    # Capture the symbol list first: piping llvm-nm straight into `grep -q`
+    # lets grep exit on the first match and SIGPIPE llvm-nm, which under
+    # `set -o pipefail` looks like a failure. Match a word boundary so
+    # bfFwStepGradFD (the finite-difference kernel) doesn't count.
+    ad_syms="$("$LLVMDIR/bin/llvm-nm" "$OUT/fw_ad.bc" 2>/dev/null || true)"
+    if ! grep -qw bfFwStepGrad <<<"$ad_syms"; then
         echo "WARNING: bfFwStepGrad missing from Enzyme output (autodiff failed)"
     fi
     INST_IN="$OUT/fw_ad.bc"
@@ -152,7 +174,7 @@ echo "== instancer + link"
 AD_IN="$OUT/whole.bc"
 
 echo "== internalize + DCE + codegen"
-KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfFwStepGradFD,bfFwStepJacFD,bfRateEval,bfLoadEeprom,bfOsdSnapshot,bfSetBase,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build,__bf_full_relocs,__bf_full_reloc_count"
+KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfFwStepGrad,bfFwStepGradFD,bfFwStepJacFD,bfRateEval,bfLoadEeprom,bfOsdSnapshot,bfSetBase,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build,__bf_full_relocs,__bf_full_reloc_count"
 "$OPT" -passes='internalize,globaldce' -internalize-public-api-list="$KEEP" \
     "$AD_IN" -o "$OUT/whole_dce.bc"
 "$CLANG" -target nvptx64-nvidia-cuda -march=$GPUARCH -O3 -x ir "$OUT/whole_dce.bc" -S -o "$OUT/fw.ptx"

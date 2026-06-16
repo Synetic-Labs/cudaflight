@@ -207,6 +207,94 @@ static Constant *stripSelfRefs(const DataLayout &DL, const GlobalVariable *image
     return C;
 }
 
+// Undo LLVM's relative-lookup-table optimization (RelLookupTableConverter).
+// At -O2 the middle-end rewrites a constant pointer array (e.g.
+// sensorTypeNames[]) into `@x.rel = [N x i32]` of PC-relative offsets, where
+// each entry is `trunc(ptrtoint(@target_i) - ptrtoint(@x.rel))`, and rewrites
+// loads into `llvm.load.relative(@x.rel, idx*4)`. The table references its own
+// address, which the NVPTX AsmPrinter cannot emit ("Circular dependency found
+// in global variable set"). There is no flag to disable the pass in LLVM 20,
+// so reverse it here: rebuild the absolute `[N x ptr]` array and turn each
+// relative load back into an indexed load. Returns the number of tables fixed.
+static unsigned delinearizeRelLookupTables(Module &M)
+{
+    LLVMContext &ctx = M.getContext();
+    PointerType *ptrTy = PointerType::get(ctx, 0);
+    Type *i8 = Type::getInt8Ty(ctx);
+    unsigned fixed = 0;
+
+    // Extract @target_i from `trunc(sub(ptrtoint @target, ptrtoint @self))`.
+    auto targetOf = [](Constant *entry) -> Constant * {
+        auto *ce = dyn_cast<ConstantExpr>(entry);
+        if (!ce || ce->getOpcode() != Instruction::Trunc)
+            return nullptr;
+        auto *sub = dyn_cast<ConstantExpr>(ce->getOperand(0));
+        if (!sub || sub->getOpcode() != Instruction::Sub)
+            return nullptr;
+        auto *p2i = dyn_cast<ConstantExpr>(sub->getOperand(0));
+        if (!p2i || p2i->getOpcode() != Instruction::PtrToInt)
+            return nullptr;
+        return p2i->getOperand(0);
+    };
+
+    std::map<GlobalVariable *, GlobalVariable *> absOf;
+    auto absTableFor = [&](GlobalVariable *relGV) -> GlobalVariable * {
+        auto it = absOf.find(relGV);
+        if (it != absOf.end())
+            return it->second;
+        auto *arr = relGV->hasInitializer()
+                        ? dyn_cast<ConstantArray>(relGV->getInitializer())
+                        : nullptr;
+        if (!arr)
+            return absOf[relGV] = nullptr;
+        SmallVector<Constant *, 8> ptrs;
+        for (unsigned i = 0, e = arr->getNumOperands(); i != e; ++i) {
+            Constant *t = targetOf(arr->getOperand(i));
+            if (!t)
+                return absOf[relGV] = nullptr;
+            ptrs.push_back(t);
+        }
+        auto *at = ArrayType::get(ptrTy, ptrs.size());
+        auto *abs = new GlobalVariable(M, at, /*isConstant=*/true,
+                                       GlobalValue::PrivateLinkage,
+                                       ConstantArray::get(at, ptrs),
+                                       relGV->getName() + ".abs");
+        abs->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
+        return absOf[relGV] = abs;
+    };
+
+    for (Function &F : M) {
+        if (!F.getName().starts_with("llvm.load.relative"))
+            continue;
+        SmallVector<CallInst *, 8> calls;
+        for (User *U : F.users())
+            if (auto *CI = dyn_cast<CallInst>(U))
+                calls.push_back(CI);
+        for (CallInst *CI : calls) {
+            auto *relGV = dyn_cast<GlobalVariable>(
+                CI->getArgOperand(0)->stripPointerCasts());
+            GlobalVariable *abs = relGV ? absTableFor(relGV) : nullptr;
+            if (!abs)
+                continue;
+            // off = idx * sizeof(i32) = idx*4; element addr in the abs (ptr)
+            // table is idx * sizeof(ptr) = idx*8 = off*2.
+            IRBuilder<> B(CI);
+            Value *byteOff = B.CreateShl(CI->getArgOperand(1), 1);
+            Value *addr = B.CreateInBoundsGEP(i8, abs, byteOff);
+            Value *ld = B.CreateLoad(ptrTy, addr);
+            CI->replaceAllUsesWith(ld);
+            CI->eraseFromParent();
+            ++fixed;
+        }
+    }
+
+    // Drop the now-dead self-referential .rel tables.
+    for (auto &kv : absOf)
+        if (kv.second && kv.first->use_empty())
+            kv.first->eraseFromParent();
+    return fixed;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 3) {
@@ -221,6 +309,13 @@ int main(int argc, char **argv)
         err.print(argv[0], errs());
         return 1;
     }
+
+    // NVPTX can't emit the self-referential relative-lookup tables LLVM's
+    // RelLookupTableConverter produces at -O2; rebuild them as absolute
+    // pointer arrays before any layout work.
+    if (unsigned n = delinearizeRelLookupTables(*M))
+        errs() << "   de-relativized " << n << " rel-lookup loads\n";
+
     const DataLayout &DL = M->getDataLayout();
     Type *i64 = Type::getInt64Ty(ctx);
     Type *i8 = Type::getInt8Ty(ctx);
