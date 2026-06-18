@@ -28,10 +28,13 @@ ARCHS="sm_80 sm_89 sm_90 sm_120" \
 ## Installing
 
 ```bash
-pip install dist/bfgym_firmware-0.1.0-cp310-cp310-linux_x86_64.whl
+pip install dist/bfgym_firmware-0.1.0-py3-none-linux_x86_64.whl
 # or with extras:
-pip install "bfgym-firmware[jax] @ file://.../dist/bfgym_firmware-...whl"
+pip install "bfgym-firmware[jax] @ file:///abs/path/to/dist/bfgym_firmware-0.1.0-py3-none-linux_x86_64.whl"
 ```
+
+The wheel is tagged `py3-none-linux_x86_64`: ABI-agnostic (no CPython
+extension), platform-locked (ships `libbfgym.so` + `fw.fatbin`).
 
 ## Using
 

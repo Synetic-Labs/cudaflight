@@ -80,4 +80,19 @@ def load(lib_path=None) -> ctypes.CDLL:
         getattr(lib, name).restype = ctypes.c_uint64
         getattr(lib, name).argtypes = [ctypes.c_void_p]
     lib.bfgym_osd_update.argtypes = [ctypes.c_void_p]
+    # raw launch parameters for the XLA FFI fused path (sim.fused in
+    # betaflight-gym): kernel function pointers, the shared CUDA context,
+    # and the per-instance state/snapshot buffers, all consumed by the
+    # in-jit custom calls.
+    for name in ("bfgym_fw_step_kernel", "bfgym_state_ptr", "bfgym_ctx",
+                 "bfgym_reset_kernel", "bfgym_snap_state_ptr", "bfgym_snap_ptr",
+                 "bfgym_jac_fd_kernel", "bfgym_grad_scratch_ptr",
+                 "bfgym_grad_kernel",
+                 "bfgym_set_base_kernel", "bfgym_stride", "bfgym_state_size",
+                 "bfgym_inst_ptr"):
+        getattr(lib, name).restype = ctypes.c_uint64
+        getattr(lib, name).argtypes = [ctypes.c_void_p]
+    for name in ("bfgym_grid", "bfgym_block"):
+        getattr(lib, name).restype = ctypes.c_uint32
+        getattr(lib, name).argtypes = [ctypes.c_void_p]
     return lib

@@ -21,7 +21,16 @@ export ARCHS
 
 PYTHON     ?= python3
 
-.PHONY: all wheel firmware artifacts clean
+# Hosting: the wheel ships as a GitHub Release asset (not committed to git —
+# it is a 14MB arch-locked binary regenerated on every firmware build). Keep
+# VERSION in sync with pyproject.toml; the tag is namespaced (bfgym-v*) so it
+# does not collide with the firmware-version release tags.
+VERSION    ?= 0.1.0
+REPO       ?= synaptech-solutions/cudaflight
+TAG        := bfgym-v$(VERSION)
+WHEEL      := dist/bfgym_firmware-$(VERSION)-py3-none-linux_x86_64.whl
+
+.PHONY: all wheel firmware artifacts clean release
 
 all: wheel
 
@@ -37,6 +46,23 @@ artifacts: firmware
 wheel: artifacts
 	rm -rf build dist *.egg-info src/*.egg-info
 	$(PYTHON) -m build --wheel
+
+# Publish the built wheel as a GitHub Release asset. Creates the tag's
+# release on first run, re-uploads (--clobber) on subsequent runs so a
+# rebuilt wheel for the same version replaces the old asset. Install URL:
+#   https://github.com/$(REPO)/releases/download/$(TAG)/$(notdir $(WHEEL))
+release: wheel
+	@command -v gh >/dev/null || { echo "gh CLI not found"; exit 1; }
+	@if gh release view $(TAG) --repo $(REPO) >/dev/null 2>&1; then \
+		echo "Uploading $(WHEEL) to existing release $(TAG)"; \
+		gh release upload $(TAG) $(WHEEL) --clobber --repo $(REPO); \
+	else \
+		echo "Creating release $(TAG)"; \
+		gh release create $(TAG) $(WHEEL) --repo $(REPO) \
+			--title "bfgym-firmware $(VERSION)" \
+			--notes "Prebuilt bfgym-firmware wheel (Linux x86_64, CUDA 12.x). pip install the asset URL directly."; \
+	fi
+	@echo "Installable from: https://github.com/$(REPO)/releases/download/$(TAG)/$(notdir $(WHEEL))"
 
 clean:
 	rm -rf build dist *.egg-info src/*.egg-info
