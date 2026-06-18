@@ -142,9 +142,29 @@ if [ "$DIFF" = 1 ]; then
     # structs). Without the latter, TA's fixpoint oscillates on those unions and
     # never terminates (accelerometerConfig_System alone was ~40% of an
     # overnight, unfinished run); with it the pass finishes in <1s.
-    echo "== freeze config globals (pre-Enzyme)"
+    # Then mark_active_pipeline: enzyme_active on the no-arg control functions
+    # (so the global-threaded pipeline is differentiated, not skipped as
+    # argument-constant -> zero gradient) AND enzyme_ta_norecur on @motor /
+    # @motor_disarmed. Those motor-output globals are [8 x float] indexed both by
+    # constant byte offsets and by a VARIABLE loop index (mixTable/stopMotors);
+    # the variable index injects a [-1] wildcard, so TA juggles two equivalent
+    # encodings of the element type ([-1,-1]:Float vs enumerated [-1,k]:Float)
+    # and the worklist oscillates forever (the second non-termination, distinct
+    # from the config-union one above). norecur pins their known [8 x float] type.
+    # Finally register_shadow_globals: a shared module-level shadow per control-
+    # state global so the adjoint threads across the separately-differentiated
+    # pipeline functions instead of each getting a throwaway local shadow.
+    echo "== freeze config + mark active pipeline + shadow globals (pre-Enzyme)"
+    # NB register_shadow_globals runs BEFORE mark_active_pipeline: it only
+    # matches `... zeroinitializer` global lines, and mark_active_pipeline
+    # appends !enzyme_ta_norecur to @motor (breaking that match if it ran first).
     "$LLVMDIR/bin/llvm-dis" "$OUT/fw_gpu.bc" -o - \
         | python3 tools/lockstep_instancer/freeze_config_globals.py \
+        | python3 tools/lockstep_instancer/register_shadow_globals.py \
+              rcData rcCommand pidData motor setpointRate \
+              rcThrottle rcDeflection rcDeflectionSmoothed rcDeflectionAbs \
+              feedforwardRaw feedforwardSmoothed rawSetpoint \
+        | python3 tools/lockstep_instancer/mark_active_pipeline.py \
         | "$LLVMDIR/bin/llvm-as" -o "$OUT/fw_gpu_frozen.bc"
 
     echo "== Enzyme autodiff pass (pre-instancer)"
@@ -161,6 +181,9 @@ if [ "$DIFF" = 1 ]; then
     if ! grep -qw bfFwStepGrad <<<"$ad_syms"; then
         echo "WARNING: bfFwStepGrad missing from Enzyme output (autodiff failed)"
     fi
+    # (bfFwStepGrad save/restores the whole instance blob around the autodiff,
+    # which also re-zeros the shadow globals each launch — so no separate
+    # shadow-zeroing pass is needed.)
     INST_IN="$OUT/fw_ad.bc"
 fi
 

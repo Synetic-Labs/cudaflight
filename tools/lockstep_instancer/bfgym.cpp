@@ -45,7 +45,7 @@ struct bfgym {
     CUcontext ctx;          // primary context, retained
     CUmodule mod;
     CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep, fFwStep;
-    CUfunction fOsd, fGradFD, fRateEval, fJacFD, fSetBase;
+    CUfunction fOsd, fGradFD, fRateEval, fJacFD, fSetBase, fGrad;
     uint32_t n;
     unsigned grid, block;
     uint64_t imageSize, stride, stateSize, actDim, obsDim;
@@ -148,8 +148,13 @@ static int discoverRelocs(bfgym *g)
     const uint64_t stride = g->stride;
     const uint64_t base = (uint64_t)g->instBuf;
     const uint64_t words = g->imageSize / 8;
+    // The cuMemcpyDtoH below copies imageSize bytes; size the host buffers to
+    // hold that many (ceil to whole words) so a non-8-multiple imageSize does
+    // not overflow the vector and corrupt the host heap. Only the first `words`
+    // whole 8-byte words are scanned as candidate pointers.
+    const uint64_t cap = (g->imageSize + 7) / 8;
 
-    std::vector<uint64_t> b0(words), b1(words), b2(words);
+    std::vector<uint64_t> b0(cap), b1(cap), b2(cap);
     if (!cuOk(cuMemcpyDtoH(b0.data(), g->snapBuf + 0 * stride, g->imageSize), "reloc read 0") ||
         !cuOk(cuMemcpyDtoH(b1.data(), g->snapBuf + 1 * stride, g->imageSize), "reloc read 1") ||
         !cuOk(cuMemcpyDtoH(b2.data(), g->snapBuf + 2 * stride, g->imageSize), "reloc read 2")) {
@@ -267,7 +272,13 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
     // The whole firmware runs on one thread's stack. The driver reserves
     // stack for the device-wide max resident thread count, so this can't
     // be extravagant: 32 KB ≈ 8 GB reserved on a 5090.
+    // The Enzyme reverse-mode kernel (bfFwStepGrad) heap-allocates its value
+    // tape via device malloc (hundreds of small enzyme_cache_alloc per thread);
+    // the default 8 MB device heap is too small once many instances run at once,
+    // and an out-of-heap malloc returns null -> illegal address. Size it up.
     if (!cuOk(cuCtxSetLimit(CU_LIMIT_STACK_SIZE, 32 * 1024), "cuCtxSetLimit") ||
+        !cuOk(cuCtxSetLimit(CU_LIMIT_MALLOC_HEAP_SIZE, (size_t)128 << 20),
+              "cuCtxSetLimit(malloc heap)") ||
         !cuOk(cuModuleLoad(&g->mod, cubin_path), "cuModuleLoad")) {
         bfgym_destroy(g);
         return nullptr;
@@ -349,6 +360,8 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
     cuModuleGetFunction(&g->fRateEval, g->mod, "bfRateEval");
     cuModuleGetFunction(&g->fJacFD, g->mod, "bfFwStepJacFD");
     cuModuleGetFunction(&g->fSetBase, g->mod, "bfSetBase");
+    // Optional: the Enzyme reverse-mode VJP kernel (present when built DIFF=1).
+    cuModuleGetFunction(&g->fGrad, g->mod, "bfFwStepGrad");
 
     uint32_t perturb = UINT32_MAX;
     void *initArgs[] = { &g->stateBuf, &perturb };
@@ -684,6 +697,12 @@ uint64_t bfgym_snap_ptr(bfgym *g) { return (uint64_t)g->snapBuf; }
 // per-instance blob save buffer the kernel uses for state restore.
 uint64_t bfgym_jac_fd_kernel(bfgym *g) { return (uint64_t)g->fJacFD; }
 uint64_t bfgym_grad_scratch_ptr(bfgym *g) { return (uint64_t)g->gradScratch; }
+
+// Raw launch param for the in-jit Enzyme VJP FFI: bfFwStepGrad(actions[N,4],
+// seedMotors[N,4], dActions[N,4]) computes dActions = J^T . seedMotors of the
+// real control law at the current per-instance state (reverse-mode autodiff).
+// 0 if the module was not built DIFF=1.
+uint64_t bfgym_grad_kernel(bfgym *g) { return (uint64_t)g->fGrad; }
 
 // Self-test for position-independent relocation: run a deterministic burst from
 // the snapshot, relocate the whole fleet's blobs to a freshly allocated buffer

@@ -518,6 +518,18 @@ int main(int argc, char **argv)
     }
 
     auto emitConstI64 = [&](StringRef name, uint64_t v) {
+        // If a declaration of this name already exists (e.g. device_diff.c
+        // references __bf_image_size), DEFINE it in place. Creating a fresh
+        // GlobalVariable with the same name would make LLVM rename the new one
+        // (__bf_image_size.1), leaving the referenced symbol external/undefined
+        // -> it reads 0 at runtime.
+        if (auto *ex = M->getNamedGlobal(name)) {
+            ex->setLinkage(GlobalValue::ExternalLinkage);
+            ex->setInitializer(ConstantInt::get(i64, v));
+            ex->setConstant(true);
+            ex->setAlignment(Align(8));
+            return;
+        }
         auto *g = new GlobalVariable(*M, i64, /*constant=*/true,
                                      GlobalValue::ExternalLinkage,
                                      ConstantInt::get(i64, v), name);
