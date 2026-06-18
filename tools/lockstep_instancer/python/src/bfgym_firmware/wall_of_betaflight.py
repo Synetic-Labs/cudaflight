@@ -33,8 +33,8 @@ import time
 import numpy as np
 import torch
 
-from bfgym import BetaflightEnv
-from osd_wall import OsdWall
+from .bfgym import BetaflightEnv
+from .osd_wall import OsdWall
 
 
 def parse_args():

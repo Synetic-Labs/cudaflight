@@ -1,0 +1,2 @@
+graft src/bfgym_firmware/_data
+include README.md

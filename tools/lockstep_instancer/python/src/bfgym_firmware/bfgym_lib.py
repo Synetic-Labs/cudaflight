@@ -1,13 +1,48 @@
-"""ctypes binding for libbfgym.so — shared by the torch and JAX wrappers."""
+"""ctypes binding for libbfgym.so and artifact resolution.
+
+The packaged wheel ships its own ``libbfgym.so`` and ``fw.fatbin`` under
+``bfgym_firmware/_data/``; ``importlib.resources`` returns those by default.
+Both can be overridden via the ``BFGYM_LIB`` / ``BFGYM_FATBIN`` environment
+variables for ad-hoc rebuilds without reinstalling the wheel.
+"""
 
 import ctypes
+import os
+from importlib.resources import as_file, files
 from pathlib import Path
 
-DEFAULT_OUT = Path(__file__).resolve().parents[3] / "obj" / "gpu"
+
+def _resource(name: str) -> Path:
+    ref = files("bfgym_firmware._data") / name
+    with as_file(ref) as p:
+        return Path(p)
 
 
-def load(lib_path=None):
-    lib = ctypes.CDLL(str(lib_path or DEFAULT_OUT / "libbfgym.so"))
+def default_lib_path() -> Path:
+    env = os.environ.get("BFGYM_LIB")
+    return Path(env) if env else _resource("libbfgym.so")
+
+
+def default_fatbin_path() -> Path:
+    env = os.environ.get("BFGYM_FATBIN")
+    if env:
+        return Path(env)
+    p = _resource("fw.fatbin")
+    if not p.exists():
+        raise FileNotFoundError(
+            "fw.fatbin missing from bfgym_firmware._data; build with "
+            "`make wheel` in tools/lockstep_instancer/python/")
+    return p
+
+
+def load(lib_path=None) -> ctypes.CDLL:
+    path = Path(lib_path) if lib_path else default_lib_path()
+    if not path.exists():
+        raise FileNotFoundError(
+            f"libbfgym.so not found at {path}; rebuild the bfgym-firmware "
+            "wheel (`make wheel` in tools/lockstep_instancer/python/) or "
+            "set BFGYM_LIB to a built libbfgym.so")
+    lib = ctypes.CDLL(str(path))
     lib.bfgym_error.restype = ctypes.c_char_p
     lib.bfgym_create.restype = ctypes.c_void_p
     lib.bfgym_create.argtypes = [ctypes.c_char_p, ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
@@ -45,4 +80,19 @@ def load(lib_path=None):
         getattr(lib, name).restype = ctypes.c_uint64
         getattr(lib, name).argtypes = [ctypes.c_void_p]
     lib.bfgym_osd_update.argtypes = [ctypes.c_void_p]
+    # raw launch parameters for the XLA FFI fused path (sim.fused in
+    # betaflight-gym): kernel function pointers, the shared CUDA context,
+    # and the per-instance state/snapshot buffers, all consumed by the
+    # in-jit custom calls.
+    for name in ("bfgym_fw_step_kernel", "bfgym_state_ptr", "bfgym_ctx",
+                 "bfgym_reset_kernel", "bfgym_snap_state_ptr", "bfgym_snap_ptr",
+                 "bfgym_jac_fd_kernel", "bfgym_grad_scratch_ptr",
+                 "bfgym_grad_kernel",
+                 "bfgym_set_base_kernel", "bfgym_stride", "bfgym_state_size",
+                 "bfgym_inst_ptr"):
+        getattr(lib, name).restype = ctypes.c_uint64
+        getattr(lib, name).argtypes = [ctypes.c_void_p]
+    for name in ("bfgym_grid", "bfgym_block"):
+        getattr(lib, name).restype = ctypes.c_uint32
+        getattr(lib, name).argtypes = [ctypes.c_void_p]
     return lib

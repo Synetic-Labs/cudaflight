@@ -52,7 +52,7 @@ static uint64_t readU64(CUmodule mod, const char *name)
 
 int main(int argc, char **argv)
 {
-    const char *modulePath = "obj/gpu/fw.cubin";
+    const char *modulePath = "obj/gpu/fw.fatbin";
     const char *eepromPath = nullptr;
     unsigned instances = 16;
     unsigned perturb = UINT32_MAX;

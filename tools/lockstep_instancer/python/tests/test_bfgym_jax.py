@@ -11,7 +11,7 @@ Run: .venv/bin/python test_bfgym_jax.py [num_envs]
 import sys
 import time
 
-from bfgym_jax import BetaflightJaxEnv, jnp
+from bfgym_firmware.bfgym_jax import BetaflightJaxEnv, jnp
 
 
 def main():

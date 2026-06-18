@@ -31,7 +31,8 @@ os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 import jax
 import jax.numpy as jnp
 
-from bfgym_lib import DEFAULT_OUT as _DEFAULT_OUT, load as _load
+from .bfgym_lib import default_fatbin_path as _default_fatbin
+from .bfgym_lib import load as _load
 
 # ---------------------------------------------------------------------------
 # Minimal DLPack producer for a raw CUDA device pointer, so jnp.from_dlpack
@@ -128,7 +129,7 @@ class BetaflightJaxEnv:
         jnp.zeros(1, device=self.device).block_until_ready()
 
         self._lib = _load(lib)
-        cubin = str(cubin or _DEFAULT_OUT / "fw.cubin")
+        cubin = str(cubin or _default_fatbin())
         # eeprom: boot-ready config image from the CPU --cli-dump converter
         # (e.g. a real quad's CLI dump); None boots defaults
         self._h = self._lib.bfgym_create_eeprom(

@@ -13,7 +13,7 @@ pidController + mixTable.
 import ctypes
 import numpy as np
 
-from bfgym_lib import DEFAULT_OUT, load
+from bfgym_firmware.bfgym_lib import default_fatbin_path, load
 
 EPS = 1e-2
 
@@ -35,7 +35,7 @@ def main():
 
     fptr = lambda a: a.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
     n = 8
-    cubin = str(DEFAULT_OUT / "fw.cubin")
+    cubin = str(default_fatbin_path())
     h = lib.bfgym_create_eeprom(cubin.encode(), n, 0, 0, None)
     if not h:
         raise SystemExit(f"create failed: {lib.bfgym_error().decode()}")

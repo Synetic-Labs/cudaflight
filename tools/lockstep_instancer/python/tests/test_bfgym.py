@@ -15,7 +15,7 @@ import time
 
 import torch
 
-from bfgym import BetaflightEnv
+from bfgym_firmware.bfgym import BetaflightEnv
 
 
 def main():

@@ -29,7 +29,9 @@ import ctypes
 
 import torch
 
-from bfgym_lib import DEFAULT_OUT as _DEFAULT_OUT, load as _load
+from .bfgym_lib import default_fatbin_path as _default_fatbin
+from .bfgym_lib import default_lib_path as _default_lib
+from .bfgym_lib import load as _load
 
 
 class _CudaArray:
@@ -47,8 +49,8 @@ class _CudaArray:
 class BetaflightEnv:
     def __init__(self, num_envs, cubin=None, lib=None, decimation=10,
                  device_index=0, settle_ms=0, auto_reset=True, eeprom=None):
-        cubin = str(cubin or _DEFAULT_OUT / "fw.cubin")
-        lib = str(lib or _DEFAULT_OUT / "libbfgym.so")
+        cubin = str(cubin or _default_fatbin())
+        lib = str(lib or _default_lib())
         self.decimation = decimation
         self.auto_reset = auto_reset
         self.device = torch.device("cuda", device_index)
