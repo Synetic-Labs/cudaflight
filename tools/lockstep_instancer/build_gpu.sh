@@ -8,7 +8,7 @@
 # flight kernels), internalized, and codegenned to a cubin loaded by the
 # driver-API runner.
 #
-# Output: obj/gpu/fw.cubin + obj/gpu/gpu_runner
+# Output: obj/gpu/fw.fatbin + obj/gpu/gpu_runner
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -17,7 +17,16 @@ OUT=obj/gpu
 DEV=tools/lockstep_instancer/device
 INSTANCER=tools/lockstep_instancer/instancer
 HARNESS_SRCS='sitl_lockstep_main.c|sitl_lockstep_physics.c|sitl_lockstep_instance.c'
-GPUARCH=${GPUARCH:-sm_120}
+# Per-TU bitcode compile target. Default to the lowest SM in the ARCHS
+# matrix below: PTX is forward-compatible (lower-arch PTX runs on higher-arch
+# devices), so compiling firmware bitcode at sm_89 lets ptxas codegen valid
+# cubins for sm_89 AND sm_120 from the same IR. Override only if you know
+# you need newer intrinsics in the firmware itself.
+GPUARCH=${GPUARCH:-sm_89}
+# Final fatbin target list: one cubin per SM, combined into fw.fatbin so the
+# driver picks the closest match at load time. Default covers the GPUs we
+# train on: sm_89 (RTX 4090), sm_120 (RTX 5090, RTX PRO 6000).
+ARCHS=${ARCHS:-"sm_89 sm_120"}
 LIBDEVICE=/opt/cuda/nvvm/libdevice/libdevice.10.bc
 
 # Differentiable build: compile and link the whole firmware with the LLVM 20
@@ -200,12 +209,24 @@ echo "== internalize + DCE + codegen"
 KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfFwStepGrad,bfFwStepGradFD,bfFwStepJacFD,bfRateEval,bfLoadEeprom,bfOsdSnapshot,bfSetBase,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build,__bf_full_relocs,__bf_full_reloc_count"
 "$OPT" -passes='internalize,globaldce' -internalize-public-api-list="$KEEP" \
     "$AD_IN" -o "$OUT/whole_dce.bc"
-"$CLANG" -target nvptx64-nvidia-cuda -march=$GPUARCH -O3 -x ir "$OUT/whole_dce.bc" -S -o "$OUT/fw.ptx"
-ptxas -arch=$GPUARCH -O3 --split-compile=0 "$OUT/fw.ptx" -o "$OUT/fw.cubin"
-echo "   $(grep -c '^\.visible \.entry\|^.visible .entry' "$OUT/fw.ptx" || true) kernels, $(wc -c < "$OUT/fw.cubin") B cubin"
+# Per-arch codegen: emit one PTX + cubin per SM in $ARCHS, then combine
+# everything into a single fatbin the CUDA driver picks the right slice
+# from at cuModuleLoad time.
+FATBIN_IMAGES=""
+n_kernels=0
+for arch in $ARCHS; do
+    "$CLANG" -target nvptx64-nvidia-cuda -march=$arch -O3 -x ir \
+        "$OUT/whole_dce.bc" -S -o "$OUT/fw.$arch.ptx"
+    ptxas -arch=$arch -O3 --split-compile=0 "$OUT/fw.$arch.ptx" -o "$OUT/fw.$arch.cubin"
+    sm_num=${arch#sm_}
+    FATBIN_IMAGES="$FATBIN_IMAGES --image3=kind=elf,sm=$sm_num,file=$OUT/fw.$arch.cubin"
+    [ "$n_kernels" = 0 ] && n_kernels=$(grep -c '^\.visible \.entry\|^.visible .entry' "$OUT/fw.$arch.ptx" || true)
+done
+fatbinary --64 --create="$OUT/fw.fatbin" $FATBIN_IMAGES
+echo "   $n_kernels kernels, $(wc -c < "$OUT/fw.fatbin") B fatbin (${ARCHS// /+})"
 
 echo "== host runner + bfgym shared lib"
 g++ -O2 tools/lockstep_instancer/gpu_runner.cpp -I/opt/cuda/include -lcuda -o "$OUT/gpu_runner"
 g++ -O2 -shared -fPIC tools/lockstep_instancer/bfgym.cpp -I/opt/cuda/include -lcuda -o "$OUT/libbfgym.so"
 
-echo "== done: $OUT/gpu_runner --module $OUT/fw.cubin"
+echo "== done: $OUT/gpu_runner --module $OUT/fw.fatbin"

@@ -1,0 +1,7 @@
+build/
+dist/
+*.egg-info/
+src/bfgym_firmware/_data/libbfgym.so
+src/bfgym_firmware/_data/fw.fatbin
+src/bfgym_firmware/_data/fw.cubin
+src/bfgym_firmware/_data/font_betaflight.c

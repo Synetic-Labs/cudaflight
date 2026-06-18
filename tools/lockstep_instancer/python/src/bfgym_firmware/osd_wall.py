@@ -12,13 +12,20 @@ until the final blit to the window.
 """
 
 import re
+from importlib.resources import as_file, files
 from pathlib import Path
 
 import numpy as np
 import torch
 
-FONT_C = (Path(__file__).resolve().parents[3]
-          / "src" / "platform" / "PICO" / "osd" / "font_betaflight.c")
+
+def _packaged_font() -> Path:
+    ref = files("bfgym_firmware._data") / "font_betaflight.c"
+    with as_file(ref) as p:
+        return Path(p)
+
+
+FONT_C = _packaged_font()
 
 GLYPH_W, GLYPH_H = 12, 18
 GLYPHS = 256

@@ -25,7 +25,7 @@ int bfgym_rate_eval(bfgym *);
 
 int main(int argc, char **argv)
 {
-    const char *cubin = argc > 1 ? argv[1] : "obj/gpu/fw.cubin";
+    const char *cubin = argc > 1 ? argv[1] : "obj/gpu/fw.fatbin";
     uint32_t N = argc > 2 ? (uint32_t)atoi(argv[2]) : 8;
 
     bfgym *g = bfgym_create_eeprom(cubin, N, 0, 0, nullptr);
