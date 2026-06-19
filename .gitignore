@@ -65,3 +65,4 @@ eeprom.bin
 AGENTS.md
 CLAUDE.md
 /tasks
+ob_dl/*

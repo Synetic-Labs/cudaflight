@@ -88,6 +88,7 @@ def load(lib_path=None) -> ctypes.CDLL:
                  "bfgym_reset_kernel", "bfgym_snap_state_ptr", "bfgym_snap_ptr",
                  "bfgym_jac_fd_kernel", "bfgym_grad_scratch_ptr",
                  "bfgym_grad_kernel",
+                 "bfgym_jac_fd_pure_kernel", "bfgym_jac_grad_pure_kernel",
                  "bfgym_set_base_kernel", "bfgym_stride", "bfgym_state_size",
                  "bfgym_inst_ptr"):
         getattr(lib, name).restype = ctypes.c_uint64

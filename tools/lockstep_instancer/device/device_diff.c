@@ -24,6 +24,12 @@ extern uint32_t __bf_inst_count;
 extern char *__bf_inst_base;
 extern uint64_t __bf_inst_stride;
 extern const uint64_t __bf_image_size;
+// Complete relocation table (flat {loc, targetOff} pairs), host-set in
+// delta_gpu.c. Used by the value-threaded gradient kernel to rebase-on-entry
+// (the twin of device_flight.c's bfRebaseBlob — duplicated here because that TU
+// is linked only AFTER the instancer, so its static helpers aren't visible).
+extern const uint64_t *__bf_full_relocs;
+extern uint64_t __bf_full_reloc_count;
 
 static inline unsigned self(void)
 {
@@ -104,5 +110,51 @@ KERNEL void bfFwStepGrad(const float *actions, const float *seedMotors,
 
     for (int i = 0; i < 4; i++) {
         dActions[(uint64_t)k * 4 + i] = da[i];
+    }
+}
+
+// Rebase-aware full-Jacobian twin of bfFwStepGrad for the value-threaded ("pure")
+// path. Enzyme reverse-mode counterpart of bfFwStepJacFDPure (device_flight.c):
+// rebases the threaded blob on entry, then fills jacOut[k][i][d] = d(motor_i)/
+// d(action_d) by one reverse sweep per motor (seed = e_i recovers row i, since
+// the sweep returns da = J^T . seed). The custom_vjp stores J in the forward and
+// contracts J^T . cotangent in a pure backward — so the backward never re-enters
+// the firmware at a drifted state. The blob is save/restored around each sweep
+// (re-zeroing the shadow globals too), exactly like bfFwStepGrad. A bfSetBase
+// launch must point __bf_inst_base at this blob ahead of the call (FFI handler).
+KERNEL void bfFwStepJacGradPure(const float *actions, float *jacOut, char *scratch)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    char *blob = __bf_inst_base + (uint64_t)k * __bf_inst_stride;
+    // rebase-on-entry (unconditional): fix this instance's self-pointers for the
+    // address XLA placed the threaded blob at, before bflRateCore dereferences them.
+    for (uint64_t r = 0; r < __bf_full_reloc_count; r++) {
+        const uint64_t loc = __bf_full_relocs[2 * r];
+        const uint64_t targetOff = __bf_full_relocs[2 * r + 1];
+        *(uint64_t *)(blob + loc) = (uint64_t)blob + targetOff;
+    }
+    char *sc = scratch + (uint64_t)k * __bf_inst_stride;
+    memcpy(sc, blob, __bf_image_size);   // freeze current instance state
+
+    const float *a = &actions[(uint64_t)k * 4];
+    float *J = &jacOut[(uint64_t)k * 16];
+
+    for (int i = 0; i < 4; i++) {
+        float motors[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        float dmotors[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        float da[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        dmotors[i] = 1.0f;   // unit motor cotangent e_i -> da = row i of J
+
+        __enzyme_autodiff((void *)fwCore,
+                          enzyme_dup, a, da,
+                          enzyme_dup, motors, dmotors);
+
+        memcpy(blob, sc, __bf_image_size);   // restore state + shadow globals
+        for (int d = 0; d < 4; d++) {
+            J[i * 4 + d] = da[d];   // J[i][d] = d(motor_i)/d(action_d)
+        }
     }
 }

@@ -67,22 +67,30 @@ typedef struct {
     uint64_t blobBase;      // address this instance's blob pointers are based at
 } bfFlight_t;
 
-// Rebase-on-move: if the blob's current address `bp` differs from the address
-// its self-pointers are based at (s->blobBase), rewrite every recorded pointer
-// slot to point into the blob at `bp`. Idempotent and independent of the stale
-// value (uses absolute targetOff), so it self-heals after the host moves the
-// blob bytes (relocation) or restores a snapshot taken at another base. A no-op
-// when the base is unchanged — zero cost on the steady-state training path.
-static inline void bfRebaseSelf(bfFlight_t *s, char *bp)
+// Unconditional rebase: rewrite every recorded self-pointer slot in the blob at
+// `bp` to point into the blob at `bp`. Independent of the stale value (uses
+// absolute targetOff), so it self-heals after the host moves the blob bytes
+// (relocation) or restores a snapshot taken at another base. Used directly by
+// the value-threaded gradient kernels, which carry no bfFlight_t to gate on.
+static inline void bfRebaseBlob(char *bp)
 {
-    if ((uint64_t)bp == s->blobBase) {
-        return;
-    }
     for (uint64_t r = 0; r < __bf_full_reloc_count; r++) {
         const uint64_t loc = __bf_full_relocs[2 * r];
         const uint64_t targetOff = __bf_full_relocs[2 * r + 1];
         *(uint64_t *)(bp + loc) = (uint64_t)bp + targetOff;
     }
+}
+
+// Rebase-on-move: if the blob's current address `bp` differs from the address
+// its self-pointers are based at (s->blobBase), rebase and record the new base.
+// A no-op when the base is unchanged — zero cost on the steady-state training
+// path (where the blob stays put and only the first step after a move pays).
+static inline void bfRebaseSelf(bfFlight_t *s, char *bp)
+{
+    if ((uint64_t)bp == s->blobBase) {
+        return;
+    }
+    bfRebaseBlob(bp);
     s->blobBase = (uint64_t)bp;
 }
 
@@ -443,20 +451,15 @@ KERNEL void bfRateEval(const float *actions, float *motorsOut)
 // dActions:    [N x 4] output, d(loss)/d(action).
 // scratch:     [N x stride] device scratch for the per-instance blob save.
 // eps:         action-space perturbation (e.g. 1e-3).
-KERNEL void bfFwStepGradFD(const float *actions, const float *seedMotors,
-                           float *dActions, char *scratch, float eps)
+// Central-difference Jacobian of bflRateCore for one instance: on return
+// jac[i][d] = d(motor_i)/d(action_d). `blob` is this instance's image base, `sc`
+// its [stride] scratch slot. The blob is frozen into `sc` once, then restored
+// after every perturbed eval, so each difference starts from the same state.
+// Shared by the three FD kernels below so the perturbation math lives in one place.
+static inline void bfRateJacobianFD(char *blob, char *sc, const float *a,
+                                    float eps, float jac[4][4])
 {
-    const unsigned k = self();
-    if (k >= __bf_inst_count) {
-        return;
-    }
-    char *blob = __bf_inst_base + (uint64_t)k * __bf_inst_stride;
-    char *sc = scratch + (uint64_t)k * __bf_inst_stride;
-    const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
-
     memcpy(sc, blob, __bf_image_size);   // freeze the current instance state
-
-    float jac[4][4];                      // jac[i][d] = d(motor_i)/d(action_d)
     for (int d = 0; d < 4; d++) {
         float rc[4], mp[4], mm[4];
         // +eps
@@ -479,6 +482,21 @@ KERNEL void bfFwStepGradFD(const float *actions, const float *seedMotors,
             jac[i][d] = (mp[i] - mm[i]) / (2.0f * eps);
         }
     }
+}
+
+KERNEL void bfFwStepGradFD(const float *actions, const float *seedMotors,
+                           float *dActions, char *scratch, float eps)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    char *blob = __bf_inst_base + (uint64_t)k * __bf_inst_stride;
+    char *sc = scratch + (uint64_t)k * __bf_inst_stride;
+    const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
+
+    float jac[4][4];                      // jac[i][d] = d(motor_i)/d(action_d)
+    bfRateJacobianFD(blob, sc, a, eps, jac);
 
     const float *seed = &seedMotors[(uint64_t)k * 4];
     for (int d = 0; d < 4; d++) {
@@ -504,27 +522,45 @@ KERNEL void bfFwStepJacFD(const float *actions, float *jacOut, char *scratch, fl
     char *blob = __bf_inst_base + (uint64_t)k * __bf_inst_stride;
     char *sc = scratch + (uint64_t)k * __bf_inst_stride;
     const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
-    float *J = &jacOut[(uint64_t)k * 16];
 
-    memcpy(sc, blob, __bf_image_size);
-    for (int d = 0; d < 4; d++) {
-        float rc[4], mp[4], mm[4];
-        for (int i = 0; i < 4; i++) {
-            rc[i] = 1500.0f + 500.0f * a[i];
+    float jac[4][4];
+    bfRateJacobianFD(blob, sc, a, eps, jac);
+
+    float *J = &jacOut[(uint64_t)k * 16];
+    for (int i = 0; i < 4; i++) {
+        for (int d = 0; d < 4; d++) {
+            J[i * 4 + d] = jac[i][d];
         }
-        rc[d] += 500.0f * eps;
-        bflRateCore(rc);
-        bflGetMotorsRaw(mp, 4);
-        memcpy(blob, sc, __bf_image_size);
-        for (int i = 0; i < 4; i++) {
-            rc[i] = 1500.0f + 500.0f * a[i];
-        }
-        rc[d] -= 500.0f * eps;
-        bflRateCore(rc);
-        bflGetMotorsRaw(mm, 4);
-        memcpy(blob, sc, __bf_image_size);
-        for (int i = 0; i < 4; i++) {
-            J[i * 4 + d] = (mp[i] - mm[i]) / (2.0f * eps);
+    }
+}
+
+// Rebase-aware twin of bfFwStepJacFD for the value-threaded ("pure") path. There
+// the firmware blob is a donated JAX buffer whose address XLA chooses and whose
+// self-pointers may be stale (a fresh snapshot copy, or post masked-reset), so
+// the Jacobian must rebase-on-entry like bfFwStepPure before touching bflRateCore
+// — otherwise it follows stale pointers into garbage. The rebase is unconditional
+// (no bfFlight_t to gate on); it leaves the blob correctly based, so the bfFwStep
+// that follows in the same custom_vjp forward rebases at most once more (idempotent).
+// A bfSetBase launch must point __bf_inst_base at this blob ahead of the call
+// (the FFI handler does that, stream-ordered).
+KERNEL void bfFwStepJacFDPure(const float *actions, float *jacOut, char *scratch, float eps)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    char *blob = __bf_inst_base + (uint64_t)k * __bf_inst_stride;
+    bfRebaseBlob(blob);   // value-threaded blob: fix self-pointers for this address
+    char *sc = scratch + (uint64_t)k * __bf_inst_stride;
+    const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
+
+    float jac[4][4];
+    bfRateJacobianFD(blob, sc, a, eps, jac);
+
+    float *J = &jacOut[(uint64_t)k * 16];
+    for (int i = 0; i < 4; i++) {
+        for (int d = 0; d < 4; d++) {
+            J[i * 4 + d] = jac[i][d];
         }
     }
 }

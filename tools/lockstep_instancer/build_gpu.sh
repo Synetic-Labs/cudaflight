@@ -31,13 +31,14 @@ LIBDEVICE=/opt/cuda/nvvm/libdevice/libdevice.10.bc
 
 # Differentiable build: compile and link the whole firmware with the LLVM 20
 # slot so the Enzyme-20 autodiff plugin can run on the linked bitcode (system
-# clang is 22, unsupported by Enzyme). DIFF=0 falls back to the system
-# toolchain with no autodiff kernel.
-# DIFF=1 builds the (currently blocked) Enzyme autodiff path via LLVM 20.
-# Default 0: the finite-difference gradient kernel (bfFwStepGradFD, in
-# device_flight.c) needs no autodiff toolchain, so the normal system build
-# carries it.
-DIFF=${DIFF:-0}
+# clang is 22, unsupported by Enzyme).
+# Default 1: Enzyme is the canonical gradient path now that it builds cleanly, so
+# the standard module carries the reverse-mode kernels (bfFwStepGrad +
+# bfFwStepJacGradPure). bfgym_create requires the pure Enzyme Jacobian, so the
+# bfgym RL env needs a DIFF=1 module. DIFF=0 still builds a valid module for the
+# standalone determinism harness (gpu_runner, which never calls bfgym_create) —
+# it just omits the Enzyme kernels and so can't back the differentiable env.
+DIFF=${DIFF:-1}
 LLVMDIR=${LLVMDIR:-/usr/lib/llvm/20}
 ENZYME=${ENZYME:-tools/enzyme_build/Enzyme/LLVMEnzyme-20.so}
 if [ "$DIFF" = 1 ]; then
@@ -167,6 +168,12 @@ if [ "$DIFF" = 1 ]; then
     # NB register_shadow_globals runs BEFORE mark_active_pipeline: it only
     # matches `... zeroinitializer` global lines, and mark_active_pipeline
     # appends !enzyme_ta_norecur to @motor (breaking that match if it ran first).
+    # Shadowed globals = the control-state chain the adjoint must thread through.
+    # NB the throttle stick has NO useful gradient and is deliberately not chased:
+    # rcCommand[THROTTLE] = rcLookupThrottle() is an int16 lookup table (rc.c), so
+    # d(motor)/d(throttle) is 0 a.e. (Enzyme is correct; the FD oracle only sees a
+    # secant across the quantization). Same class as the motor-output int16
+    # quantization that fwCore sidesteps via bflGetMotorsRaw.
     "$LLVMDIR/bin/llvm-dis" "$OUT/fw_gpu.bc" -o - \
         | python3 tools/lockstep_instancer/freeze_config_globals.py \
         | python3 tools/lockstep_instancer/register_shadow_globals.py \
@@ -206,7 +213,7 @@ echo "== instancer + link"
 AD_IN="$OUT/whole.bc"
 
 echo "== internalize + DCE + codegen"
-KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfFwStepGrad,bfFwStepGradFD,bfFwStepJacFD,bfRateEval,bfLoadEeprom,bfOsdSnapshot,bfSetBase,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build,__bf_full_relocs,__bf_full_reloc_count"
+KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfFwStepGrad,bfFwStepGradFD,bfFwStepJacFD,bfFwStepJacFDPure,bfFwStepJacGradPure,bfRateEval,bfLoadEeprom,bfOsdSnapshot,bfSetBase,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build,__bf_full_relocs,__bf_full_reloc_count"
 "$OPT" -passes='internalize,globaldce' -internalize-public-api-list="$KEEP" \
     "$AD_IN" -o "$OUT/whole_dce.bc"
 # Per-arch codegen: emit one PTX + cubin per SM in $ARCHS, then combine

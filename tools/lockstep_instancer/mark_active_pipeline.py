@@ -46,9 +46,10 @@ rcData rcCommand pidData motor setpointRate | mark_active_pipeline.py
 import re
 import sys
 
-# enzyme_active: the no-arg pipeline functions + the cloned rate path. NOTE the
-# clone processRcCommand_grad is marked (not the firmware-shared original).
-ACTIVE_FNS = ["updateRcCommands", "processRcCommand_grad", "pidController",
+# enzyme_active: the no-arg pipeline functions + the cloned rate/pid paths. NOTE
+# the CLONES (processRcCommand_grad, pidController_grad) are marked, not the
+# firmware-shared originals (see CLONES below).
+ACTIVE_FNS = ["updateRcCommands", "processRcCommand_grad", "pidController_grad",
               "mixTable", "pt1FilterApply", "pt2FilterApply", "pt3FilterApply",
               # Accessors that return an active global by value across a call
               # boundary; without forcing them active, Enzyme treats the call as
@@ -64,11 +65,36 @@ ACTIVE_FNS = ["updateRcCommands", "processRcCommand_grad", "pidController",
               "getRcDeflection", "getRcDeflectionAbs", "mixerGetRcThrottle"]
 NORECUR_GLOBALS = ["motor", "motor_disarmed"]
 
-CLONE_FN = "processRcCommand"          # shared firmware/gradient fn to clone
-CLONE_NAME = "processRcCommand_grad"   # gradient-only devirtualized clone
-CLONE_CALLER = "bflRateCore"           # gradient-only; redirect its call to clone
-DEVIRT_FNPTR = "applyRates"
-DEVIRT_TARGET = "applyActualRates"
+CLONE_CALLER = "bflRateCore"  # gradient entry's pipeline; redirect its calls to the clones
+
+# Functions SHARED between the firmware hot loop and the gradient pipeline that we
+# clone (gradient-only) so we can devirtualize an indirect call inside the clone
+# without miscompiling the firmware path. Each clone redirects ONE or more of the
+# caller's calls; `devirt` lists (load-regex-with-%capture, concrete target) pairs.
+# `expect` is the exact devirt-substitution count — a guard against the IR layout
+# drifting out from under a hardcoded match (fail the build loudly instead of
+# silently losing the gradient).
+CLONES = [
+    # processRcCommand dispatches the rate curve through @applyRates (a runtime
+    # fn ptr). An indirect ACTIVE call makes Enzyme invert the pointer and read a
+    # null shadow -> illegal address. Devirtualize to the concrete curve (default
+    # RATES_TYPE_ACTUAL). The FD oracle (real indirect call) validates the target.
+    {"fn": "processRcCommand", "clone": "processRcCommand_grad",
+     "devirt": [(r'(%\d+) = load ptr, ptr @applyRates\b', "applyActualRates")],
+     "expect": 1},
+    # pidController runs the yaw P-term through ptermYawLowpassApplyFn (pid.c) —
+    # a fn ptr loaded from the (enzyme-inactive) pidRuntime struct, so Enzyme
+    # can't devirtualize it and drops the lowpassed-P contribution (~8% of the
+    # within-step yaw response). Devirtualize to pt1FilterApply (the configured
+    # filter at the default yaw_lowpass_hz=100; 0 would make it nullFilterApply).
+    # i64 240 is the byte offset of ptermYawLowpassApplyFn within pidRuntime_s
+    # (the 4th filterApplyFnPtr: dtermNotch@24, dtermLowpass@96, dtermLowpass2@168,
+    # ptermYawLowpass@240). The FD oracle validates; `expect` guards the offset.
+    {"fn": "pidController", "clone": "pidController_grad",
+     "devirt": [(r'(%\d+) = load ptr, ptr getelementptr inbounds nuw '
+                 r'\(i8, ptr @pidRuntime, i64 240\)', "pt1FilterApply")],
+     "expect": 1},
+]
 
 
 def fn_block(lines, name):
@@ -82,40 +108,62 @@ def fn_block(lines, name):
     return None, None
 
 
+def clone_and_devirt(lines, spec):
+    """Clone spec['fn'] -> spec['clone'], devirtualizing the indirect calls named
+    by spec['devirt'] inside the clone only. Returns (lines, cloned, n_devirt)."""
+    s, e = fn_block(lines, spec["fn"])
+    if s is None:
+        return lines, False, 0
+    block = lines[s:e + 1]
+    block[0] = block[0].replace('@' + spec["fn"] + '(', '@' + spec["clone"] + '(', 1)
+    clone = '\n'.join(block)
+    n_devirt = 0
+    # devirtualize: for each `%v = load ptr, <ptr-expr>`, rewrite `call ... %v(`
+    # (the indirect call through that loaded fn ptr) to a direct call to target.
+    for load_re, target in spec["devirt"]:
+        for v in re.findall(load_re, clone):
+            clone, c = re.subn(r'(call[^\n]*?float )' + re.escape(v) + r'\(',
+                               r'\1@' + target + '(', clone)
+            n_devirt += c
+    # insert the clone right after the original block (as individual lines so the
+    # enzyme_active pass below can match its define header)
+    lines = lines[:e + 1] + [''] + clone.split('\n') + lines[e + 1:]
+    return lines, True, n_devirt
+
+
+def redirect_calls(lines, caller, orig, clone):
+    """Within `caller`, point every `@orig(` call at `@clone(` (the firmware's
+    identical calls elsewhere stay untouched). Returns (lines, n_redirect)."""
+    cs, ce = fn_block(lines, caller)
+    n = 0
+    if cs is not None:
+        for i in range(cs, ce + 1):
+            new = lines[i].replace('@' + orig + '(', '@' + clone + '(')
+            if new != lines[i]:
+                lines[i] = new
+                n += 1
+    return lines, n
+
+
 def main():
     src = sys.stdin.read()
     lines = src.split('\n')
 
-    # 3a. Clone processRcCommand -> processRcCommand_grad, devirtualizing the
-    #     @applyRates indirect call inside the clone only.
-    n_devirt = 0
-    cloned = False
-    s, e = fn_block(lines, CLONE_FN)
-    if s is not None:
-        block = lines[s:e + 1]
-        block[0] = block[0].replace('@' + CLONE_FN + '(', '@' + CLONE_NAME + '(', 1)
-        clone = '\n'.join(block)
-        # devirtualize: each `%v = load ptr, ptr @applyRates` -> call `%v(` direct
-        for v in re.findall(r'(%\d+) = load ptr, ptr @' + re.escape(DEVIRT_FNPTR) + r'\b',
-                            clone):
-            clone, c = re.subn(r'(call[^\n]*?float )' + re.escape(v) + r'\(',
-                               r'\1@' + DEVIRT_TARGET + '(', clone)
-            n_devirt += c
-        # insert the clone right after the original block (as individual lines so
-        # the enzyme_active pass below can match its define header)
-        lines = lines[:e + 1] + [''] + clone.split('\n') + lines[e + 1:]
-        cloned = True
-
-    # 3b. Redirect ONLY bflRateCore's call to the clone (the firmware's identical
-    #     `call void @processRcCommand()` in taskMainPidLoop stays untouched).
-    n_redirect = 0
-    cs, ce = fn_block(lines, CLONE_CALLER)
-    if cs is not None:
-        for i in range(cs, ce + 1):
-            new = lines[i].replace('@' + CLONE_FN + '()', '@' + CLONE_NAME + '()')
-            if new != lines[i]:
-                lines[i] = new
-                n_redirect += 1
+    # 3. Gradient-only clones: clone each shared fn, devirtualize its indirect
+    #    call(s) in the clone, and redirect bflRateCore (the gradient entry's
+    #    pipeline) at the clones. The firmware hot loop keeps the originals.
+    clone_report = {}
+    for spec in CLONES:
+        lines, cloned, n_devirt = clone_and_devirt(lines, spec)
+        lines, n_redirect = redirect_calls(lines, CLONE_CALLER, spec["fn"], spec["clone"])
+        clone_report[spec["clone"]] = (cloned, n_devirt, n_redirect)
+        exp = spec.get("expect")
+        if cloned and exp is not None and n_devirt != exp:
+            sys.stderr.write(
+                f"   ERROR: {spec['fn']} devirt matched {n_devirt} call(s), "
+                f"expected {exp} — the hardcoded IR pattern has drifted "
+                f"(check the {spec['fn']} indirect-call site / struct offset)\n")
+            sys.exit(1)
 
     # 1. enzyme_active — insert the attr string before the trailing `#N {` of the
     #    function's define line (handles params with `)` e.g. nofpclass(nan inf)).
@@ -145,10 +193,12 @@ def main():
         src = src.rstrip('\n') + '\n' + '\n'.join(new_md) + '\n'
 
     sys.stdout.write(src)
+    for clone, (cloned, n_devirt, n_redirect) in clone_report.items():
+        sys.stderr.write(
+            f'   cloned ->{clone} ({cloned}, devirt {n_devirt}, '
+            f'redirected {n_redirect} {CLONE_CALLER} call)\n')
     sys.stderr.write(
-        f'   cloned {CLONE_FN}->{CLONE_NAME} ({cloned}, devirt {n_devirt} {DEVIRT_FNPTR}, '
-        f'redirected {n_redirect} {CLONE_CALLER} call); '
-        f'enzyme_active: {n_active}; enzyme_ta_norecur on {n_nr} motor globals\n')
+        f'   enzyme_active: {n_active}; enzyme_ta_norecur on {n_nr} motor globals\n')
     missing = [f for f in ACTIVE_FNS if f not in n_active]
     if missing:
         sys.stderr.write(f'   WARNING: active fns not found: {missing}\n')

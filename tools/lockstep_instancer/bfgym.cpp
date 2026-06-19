@@ -46,6 +46,7 @@ struct bfgym {
     CUmodule mod;
     CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep, fFwStep;
     CUfunction fOsd, fGradFD, fRateEval, fJacFD, fSetBase, fGrad;
+    CUfunction fJacFDPure, fJacGradPure;  // value-threaded (rebase-aware) Jacobians
     uint32_t n;
     unsigned grid, block;
     uint64_t imageSize, stride, stateSize, actDim, obsDim;
@@ -271,17 +272,32 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
 
     // The whole firmware runs on one thread's stack. The driver reserves
     // stack for the device-wide max resident thread count, so this can't
-    // be extravagant: 32 KB ≈ 8 GB reserved on a 5090.
-    // The Enzyme reverse-mode kernel (bfFwStepGrad) heap-allocates its value
-    // tape via device malloc (hundreds of small enzyme_cache_alloc per thread);
-    // the default 8 MB device heap is too small once many instances run at once,
-    // and an out-of-heap malloc returns null -> illegal address. Size it up.
+    // be extravagant: 32 KB ≈ 8 GB reserved on a 5090. (Resizable at any time.)
     if (!cuOk(cuCtxSetLimit(CU_LIMIT_STACK_SIZE, 32 * 1024), "cuCtxSetLimit") ||
-        !cuOk(cuCtxSetLimit(CU_LIMIT_MALLOC_HEAP_SIZE, (size_t)128 << 20),
-              "cuCtxSetLimit(malloc heap)") ||
         !cuOk(cuModuleLoad(&g->mod, cubin_path), "cuModuleLoad")) {
         bfgym_destroy(g);
         return nullptr;
+    }
+    // The Enzyme reverse-mode kernels (bfFwStepGrad / bfFwStepJacGradPure)
+    // heap-allocate their value tape via device malloc (hundreds of small
+    // enzyme_cache_alloc per thread); the default 8 MB device heap is too small
+    // once many instances run at once, and an out-of-heap malloc returns null ->
+    // illegal address. Size it up — but best-effort: CU_LIMIT_MALLOC_HEAP_SIZE is
+    // locked once the context is initialized, and we usually share XLA's primary
+    // context (which jax touches before bfgym_create), so the call returns
+    // INVALID_VALUE. That is non-fatal: the heap keeps its current size, which is
+    // ample for the small fleets used in tests/grad checks. To guarantee the
+    // larger heap under XLA, set it before jax initializes — e.g. export
+    // XLA_PYTHON_CLIENT_PREALLOCATE=false and create the env before any jax op,
+    // or raise it via the driver in the host process first.
+    const CUresult heapRc = cuCtxSetLimit(CU_LIMIT_MALLOC_HEAP_SIZE, (size_t)128 << 20);
+    if (heapRc != CUDA_SUCCESS) {
+        const char *msg = nullptr;
+        cuGetErrorString(heapRc, &msg);
+        fprintf(stderr, "[bfgym] note: could not enlarge device malloc heap to "
+                "128 MB (%s); keeping current size — fine for small fleets, but "
+                "large Enzyme-gradient fleets may exhaust the default 8 MB heap\n",
+                msg ? msg : "?");
     }
 
     int err = 0;
@@ -349,7 +365,12 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
          cuOk(cuModuleGetFunction(&g->fReset, g->mod, "bfReset"), "bfReset") &&
          cuOk(cuModuleGetFunction(&g->fStep, g->mod, "bfStep"), "bfStep") &&
          cuOk(cuModuleGetFunction(&g->fFwStep, g->mod, "bfFwStep"), "bfFwStep") &&
-         cuOk(cuModuleGetFunction(&g->fOsd, g->mod, "bfOsdSnapshot"), "bfOsdSnapshot");
+         cuOk(cuModuleGetFunction(&g->fOsd, g->mod, "bfOsdSnapshot"), "bfOsdSnapshot") &&
+         // Value-threaded (rebase-aware) Jacobians for the differentiable rollout.
+         // Both are part of the canonical build (DIFF=1); the Python package picks
+         // which one the custom_vjp uses at runtime (Enzyme by default, FD oracle).
+         cuOk(cuModuleGetFunction(&g->fJacFDPure, g->mod, "bfFwStepJacFDPure"), "bfFwStepJacFDPure") &&
+         cuOk(cuModuleGetFunction(&g->fJacGradPure, g->mod, "bfFwStepJacGradPure"), "bfFwStepJacGradPure");
     if (!ok) {
         bfgym_destroy(g);
         return nullptr;
@@ -697,6 +718,16 @@ uint64_t bfgym_snap_ptr(bfgym *g) { return (uint64_t)g->snapBuf; }
 // per-instance blob save buffer the kernel uses for state restore.
 uint64_t bfgym_jac_fd_kernel(bfgym *g) { return (uint64_t)g->fJacFD; }
 uint64_t bfgym_grad_scratch_ptr(bfgym *g) { return (uint64_t)g->gradScratch; }
+
+// Raw launch params for the value-threaded ("pure") Jacobian FFIs used by the
+// differentiable rollout's custom_vjp. Both rebase the donated blob on entry
+// (bfSetBase must point __bf_inst_base at it first) and write the full
+// jacOut[N,16], J[k][i][d] = d(motor_i)/d(action_d) at the pre-step state:
+//   bfFwStepJacFDPure(actions[N,4], jacOut[N,16], scratch, eps)  — finite diff
+//   bfFwStepJacGradPure(actions[N,4], jacOut[N,16], scratch)     — Enzyme reverse
+// Both share gradScratch for the per-instance state save/restore.
+uint64_t bfgym_jac_fd_pure_kernel(bfgym *g) { return (uint64_t)g->fJacFDPure; }
+uint64_t bfgym_jac_grad_pure_kernel(bfgym *g) { return (uint64_t)g->fJacGradPure; }
 
 // Raw launch param for the in-jit Enzyme VJP FFI: bfFwStepGrad(actions[N,4],
 // seedMotors[N,4], dActions[N,4]) computes dActions = J^T . seedMotors of the
