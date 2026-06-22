@@ -249,8 +249,15 @@ void bfgym_destroy(bfgym *g)
 // into every instance's RAM EEPROM before boot, so the fleet flies that
 // configuration instead of defaults. Returns NULL on failure (see
 // bfgym_error).
-bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint32_t settle_ms,
-                           const char *eeprom_path)
+// Full create. with_grad allocates the differentiable-rollout scratch buffers
+// (seedBuf/dactBuf, and crucially gradScratch = stride*n — a per-instance blob
+// save-slot as large as the entire instance array). PPO does NOT use them, so
+// passing with_grad=0 nearly halves the dominant per-instance memory and lets a
+// far larger fleet fit. The plain bfgym_create_eeprom() wrapper keeps with_grad=1
+// for ABI compatibility (grad harnesses / the differentiable env).
+bfgym *bfgym_create_eeprom_ex(const char *cubin_path, uint32_t n, int device,
+                              uint32_t settle_ms, const char *eeprom_path,
+                              int with_grad)
 {
     if (settle_ms == 0) {
         settle_ms = 7000;
@@ -333,9 +340,6 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
         cuOk(cuMemAlloc(&g->motorBuf, 4 * 4 * n), "alloc motors") &&
         cuOk(cuMemAlloc(&g->osdBuf, g->osdRows * g->osdCols * n), "alloc osd") &&
         cuOk(cuMemAlloc(&g->osdAttrBuf, g->osdRows * g->osdCols * n), "alloc osd attrs") &&
-        cuOk(cuMemAlloc(&g->seedBuf, 4 * 4 * n), "alloc grad seed") &&
-        cuOk(cuMemAlloc(&g->dactBuf, 4 * 4 * n), "alloc grad out") &&
-        cuOk(cuMemAlloc(&g->gradScratch, g->stride * n), "alloc grad scratch") &&
         cuOk(cuMemsetD8(g->osdBuf, 0x20, g->osdRows * g->osdCols * n), "blank osd") &&
         cuOk(cuMemsetD8(g->osdAttrBuf, 0, g->osdRows * g->osdCols * n), "zero osd attrs") &&
         cuOk(cuMemsetD8(g->actBuf, 0, 4 * g->actDim * n), "zero actions") &&
@@ -347,6 +351,20 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
     if (!ok) {
         bfgym_destroy(g);
         return nullptr;
+    }
+
+    // Differentiable-rollout scratch — only when requested. gradScratch alone is
+    // stride*n (as big as the whole instance array), so skipping it for PPO is
+    // the difference between fitting ~1.5x more worlds and OOMing. Left null
+    // otherwise; bfgym_destroy's free loop tolerates null (cuMemFree(0) no-ops).
+    if (with_grad) {
+        ok = cuOk(cuMemAlloc(&g->seedBuf, 4 * 4 * n), "alloc grad seed") &&
+             cuOk(cuMemAlloc(&g->dactBuf, 4 * 4 * n), "alloc grad out") &&
+             cuOk(cuMemAlloc(&g->gradScratch, g->stride * n), "alloc grad scratch");
+        if (!ok) {
+            bfgym_destroy(g);
+            return nullptr;
+        }
     }
 
     char *base = (char *)g->instBuf;
@@ -467,6 +485,15 @@ bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device, uint3
         return nullptr;
     }
     return g;
+}
+
+// Eeprom create, kept for ABI compatibility — grad buffers ON (the grad harness
+// and any caller of the old 5-arg symbol get the differentiable scratch).
+bfgym *bfgym_create_eeprom(const char *cubin_path, uint32_t n, int device,
+                           uint32_t settle_ms, const char *eeprom_path)
+{
+    return bfgym_create_eeprom_ex(cubin_path, n, device, settle_ms, eeprom_path,
+                                  /*with_grad=*/1);
 }
 
 // Default-config create, kept for ABI compatibility.

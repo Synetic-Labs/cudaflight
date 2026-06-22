@@ -51,6 +51,14 @@ def load(lib_path=None) -> ctypes.CDLL:
     lib.bfgym_create_eeprom.restype = ctypes.c_void_p
     lib.bfgym_create_eeprom.argtypes = [ctypes.c_char_p, ctypes.c_uint32, ctypes.c_int,
                                         ctypes.c_uint32, ctypes.c_char_p]
+    # with_grad variant: when 0, skips the differentiable-rollout scratch
+    # (gradScratch = stride*n, as large as the whole instance array) so a PPO-only
+    # fleet fits ~1.5x more worlds. Guarded for older libbfgym.so without it.
+    if hasattr(lib, "bfgym_create_eeprom_ex"):
+        lib.bfgym_create_eeprom_ex.restype = ctypes.c_void_p
+        lib.bfgym_create_eeprom_ex.argtypes = [ctypes.c_char_p, ctypes.c_uint32,
+                                               ctypes.c_int, ctypes.c_uint32,
+                                               ctypes.c_char_p, ctypes.c_int]
     for name in ("bfgym_num_envs", "bfgym_act_dim", "bfgym_obs_dim"):
         getattr(lib, name).restype = ctypes.c_uint32
         getattr(lib, name).argtypes = [ctypes.c_void_p]
