@@ -38,7 +38,8 @@ static inline unsigned self(void)
 }
 
 // ---- Enzyme markers -------------------------------------------------------
-extern void __enzyme_autodiff(void *, ...);
+extern void __enzyme_autodiff(void *, ...);   // reverse mode (taped)
+extern void __enzyme_fwddiff(void *, ...);    // forward mode (no tape)
 int enzyme_dup;
 
 // Freeze the stateful config/runtime globals: their pointer-laden structs are
@@ -114,14 +115,21 @@ KERNEL void bfFwStepGrad(const float *actions, const float *seedMotors,
 }
 
 // Rebase-aware full-Jacobian twin of bfFwStepGrad for the value-threaded ("pure")
-// path. Enzyme reverse-mode counterpart of bfFwStepJacFDPure (device_flight.c):
+// path. FORWARD-mode Enzyme counterpart of bfFwStepJacFDPure (device_flight.c):
 // rebases the threaded blob on entry, then fills jacOut[k][i][d] = d(motor_i)/
-// d(action_d) by one reverse sweep per motor (seed = e_i recovers row i, since
-// the sweep returns da = J^T . seed). The custom_vjp stores J in the forward and
-// contracts J^T . cotangent in a pure backward — so the backward never re-enters
-// the firmware at a drifted state. The blob is save/restored around each sweep
-// (re-zeroing the shadow globals too), exactly like bfFwStepGrad. A bfSetBase
-// launch must point __bf_inst_base at this blob ahead of the call (FFI handler).
+// d(action_d) by one FORWARD sweep per action (seed = e_d recovers COLUMN d,
+// since a forward sweep returns dmotors = J . seed). The custom_vjp stores J in
+// the forward and contracts J^T . cotangent in a pure backward — so the backward
+// never re-enters the firmware at a drifted state. The blob is save/restored
+// around each sweep (re-zeroing the shadow globals too). A bfSetBase launch must
+// point __bf_inst_base at this blob ahead of the call (FFI handler).
+//
+// Forward mode (NOT reverse): for the R^4->R^4 control Jacobian a forward sweep
+// per action column costs exactly the same 4 evaluations as a reverse sweep per
+// motor row, but carries NO value tape — reverse-mode Enzyme heap-allocates its
+// tape via device malloc (hundreds of small allocs per thread), which exhausts
+// the device malloc heap once fleet x horizon is large (a null malloc -> illegal
+// address; see bfgym.cpp). Forward mode has no tape, so it scales to any fleet.
 KERNEL void bfFwStepJacGradPure(const float *actions, float *jacOut, char *scratch)
 {
     const unsigned k = self();
@@ -142,19 +150,19 @@ KERNEL void bfFwStepJacGradPure(const float *actions, float *jacOut, char *scrat
     const float *a = &actions[(uint64_t)k * 4];
     float *J = &jacOut[(uint64_t)k * 16];
 
-    for (int i = 0; i < 4; i++) {
+    for (int d = 0; d < 4; d++) {
         float motors[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        float dmotors[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        float dmotors[4] = { 0.0f, 0.0f, 0.0f, 0.0f };   // forward sweep result
         float da[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        dmotors[i] = 1.0f;   // unit motor cotangent e_i -> da = row i of J
+        da[d] = 1.0f;   // unit action tangent e_d -> dmotors = column d of J
 
-        __enzyme_autodiff((void *)fwCore,
-                          enzyme_dup, a, da,
-                          enzyme_dup, motors, dmotors);
+        __enzyme_fwddiff((void *)fwCore,
+                         enzyme_dup, a, da,
+                         enzyme_dup, motors, dmotors);
 
         memcpy(blob, sc, __bf_image_size);   // restore state + shadow globals
-        for (int d = 0; d < 4; d++) {
-            J[i * 4 + d] = da[d];   // J[i][d] = d(motor_i)/d(action_d)
+        for (int i = 0; i < 4; i++) {
+            J[i * 4 + d] = dmotors[i];   // J[i][d] = d(motor_i)/d(action_d)
         }
     }
 }
