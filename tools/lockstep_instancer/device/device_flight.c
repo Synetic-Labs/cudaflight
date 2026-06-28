@@ -40,7 +40,7 @@ extern uint64_t __bf_inst_stride;
 extern uint32_t __bf_inst_count;
 
 // complete relocation table (static + runtime-written self-pointers),
-// discovered and uploaded by the host (bfgym.cpp discoverRelocs). Packed as
+// discovered and uploaded by the host (cudaflight.cpp discoverRelocs). Packed as
 // {loc, targetOff} pairs; used to rebase a blob whose bytes have moved to a
 // new base (e.g. XLA placed the buffer somewhere new). Null until discovered.
 extern const uint64_t *__bf_full_relocs;

@@ -129,7 +129,7 @@ KERNEL void bfFwStepGrad(const float *actions, const float *seedMotors,
 // motor row, but carries NO value tape — reverse-mode Enzyme heap-allocates its
 // tape via device malloc (hundreds of small allocs per thread), which exhausts
 // the device malloc heap once fleet x horizon is large (a null malloc -> illegal
-// address; see bfgym.cpp). Forward mode has no tape, so it scales to any fleet.
+// address; see cudaflight.cpp). Forward mode has no tape, so it scales to any fleet.
 KERNEL void bfFwStepJacGradPure(const float *actions, float *jacOut, char *scratch)
 {
     const unsigned k = self();

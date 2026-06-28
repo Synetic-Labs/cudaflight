@@ -1,7 +1,8 @@
 build/
 dist/
 *.egg-info/
-src/bfgym_firmware/_data/libbfgym.so
-src/bfgym_firmware/_data/fw.fatbin
-src/bfgym_firmware/_data/fw.cubin
-src/bfgym_firmware/_data/font_betaflight.c
+src/cudaflight/_data/libcudaflight.so
+src/cudaflight/_data/fw.fatbin
+src/cudaflight/_data/fw.cubin
+src/cudaflight/_data/font_betaflight.c
+__pycache__/

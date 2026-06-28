@@ -33,7 +33,7 @@ import time
 import numpy as np
 import torch
 
-from .bfgym import BetaflightEnv
+from .torch_env import BetaflightEnv
 from .osd_wall import OsdWall
 
 

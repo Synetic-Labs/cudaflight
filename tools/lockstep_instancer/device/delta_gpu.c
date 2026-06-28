@@ -14,7 +14,7 @@ uint64_t __bf_inst_stride;
 uint32_t __bf_inst_count;
 
 // Complete relocation table (static + runtime-written self-pointers), set by
-// the host once it has been discovered (bfgym.cpp discoverRelocs). The pointer
+// the host once it has been discovered (cudaflight.cpp discoverRelocs). The pointer
 // itself is host-written to a device buffer of {loc, targetOff} pairs; used by
 // the device-side rebase-on-move (device_flight.c bfRebaseSelf).
 const uint64_t *__bf_full_relocs;

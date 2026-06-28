@@ -34,9 +34,9 @@ LIBDEVICE=/opt/cuda/nvvm/libdevice/libdevice.10.bc
 # clang is 22, unsupported by Enzyme).
 # Default 1: Enzyme is the canonical gradient path now that it builds cleanly, so
 # the standard module carries the reverse-mode kernels (bfFwStepGrad +
-# bfFwStepJacGradPure). bfgym_create requires the pure Enzyme Jacobian, so the
-# bfgym RL env needs a DIFF=1 module. DIFF=0 still builds a valid module for the
-# standalone determinism harness (gpu_runner, which never calls bfgym_create) —
+# bfFwStepJacGradPure). cudaflight_create requires the pure Enzyme Jacobian, so the
+# cudaflight RL env needs a DIFF=1 module. DIFF=0 still builds a valid module for the
+# standalone determinism harness (gpu_runner, which never calls cudaflight_create) —
 # it just omits the Enzyme kernels and so can't back the differentiable env.
 DIFF=${DIFF:-1}
 LLVMDIR=${LLVMDIR:-/usr/lib/llvm/20}
@@ -232,8 +232,8 @@ done
 fatbinary --64 --create="$OUT/fw.fatbin" $FATBIN_IMAGES
 echo "   $n_kernels kernels, $(wc -c < "$OUT/fw.fatbin") B fatbin (${ARCHS// /+})"
 
-echo "== host runner + bfgym shared lib"
+echo "== host runner + cudaflight shared lib"
 g++ -O2 tools/lockstep_instancer/gpu_runner.cpp -I/opt/cuda/include -lcuda -o "$OUT/gpu_runner"
-g++ -O2 -shared -fPIC tools/lockstep_instancer/bfgym.cpp -I/opt/cuda/include -lcuda -o "$OUT/libbfgym.so"
+g++ -O2 -shared -fPIC tools/lockstep_instancer/cudaflight.cpp -I/opt/cuda/include -lcuda -o "$OUT/libcudaflight.so"
 
 echo "== done: $OUT/gpu_runner --module $OUT/fw.fatbin"

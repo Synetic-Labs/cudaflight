@@ -1,6 +1,6 @@
 """Setuptools shim for the wheel tag.
 
-The wheel ships ``libbfgym.so`` and ``fw.fatbin`` as package data, so it is
+The wheel ships ``libcudaflight.so`` and ``fw.fatbin`` as package data, so it is
 binding to Linux x86_64 + CUDA driver but contains no Python C extensions —
 the right tag is ``py3-none-linux_x86_64``: Python-version-agnostic ABI,
 platform-locked. Achieved by:

@@ -20,7 +20,7 @@ import torch
 
 
 def _packaged_font() -> Path:
-    ref = files("bfgym_firmware._data") / "font_betaflight.c"
+    ref = files("cudaflight._data") / "font_betaflight.c"
     with as_file(ref) as p:
         return Path(p)
 

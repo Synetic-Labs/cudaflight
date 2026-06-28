@@ -7,7 +7,7 @@
      obs/action tensors alone — every torch op runs on the GPU
   C  crash + auto-reset: throttle cut raises dones, auto-reset restores
 
-Run: python test_bfgym.py [num_envs]
+Run: python test_cudaflight.py [num_envs]
 """
 
 import sys
@@ -15,15 +15,15 @@ import time
 
 import torch
 
-from bfgym_firmware.bfgym import BetaflightEnv
+from cudaflight.torch_env import BetaflightEnv
 
 
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 256
-    print(f"[bfgym-test] creating {n} instances (boot + settle + arm + snapshot)...")
+    print(f"[cudaflight-test] creating {n} instances (boot + settle + arm + snapshot)...")
     t0 = time.time()
     env = BetaflightEnv(n, auto_reset=False)
-    print(f"[bfgym-test] created in {time.time() - t0:.1f}s: "
+    print(f"[cudaflight-test] created in {time.time() - t0:.1f}s: "
           f"obs {tuple(env.obs.shape)}, actions {tuple(env.actions.shape)}, "
           f"device {env.obs.device}")
     ok = True
@@ -42,7 +42,7 @@ def main():
     h2, o2 = burst()
     a_ok = h1 == h2 and torch.equal(o1, o2)
     ok = ok and a_ok
-    print(f"[bfgym-test] A determinism-across-reset: {'bit-exact' if a_ok else 'FAILED'}")
+    print(f"[cudaflight-test] A determinism-across-reset: {'bit-exact' if a_ok else 'FAILED'}")
 
     # B: torch P-controller hover at 5m — closed loop, all on-device
     obs = env.reset()
@@ -61,7 +61,7 @@ def main():
     mean_alt = float(alt.mean().item())
     b_ok = not any_done and in_band
     ok = ok and b_ok
-    print(f"[bfgym-test] B torch-P-controller hover: mean alt {mean_alt:.2f}m "
+    print(f"[cudaflight-test] B torch-P-controller hover: mean alt {mean_alt:.2f}m "
           f"after 10s, dones={int(any_done)}, in-band={int(in_band)} "
           f"({1000 * n / wall:,.0f} env-steps/s)")
 
@@ -75,7 +75,7 @@ def main():
         if bool(done.all().item()):
             crashed = True
             break
-    print(f"[bfgym-test] C crash: all done after {i + 1} steps: {'yes' if crashed else 'NO'}")
+    print(f"[cudaflight-test] C crash: all done after {i + 1} steps: {'yes' if crashed else 'NO'}")
     ok = ok and crashed
     # auto-reset already restored them; next step must be grounded, not done
     actions[:, 2] = 0.36
@@ -83,10 +83,10 @@ def main():
     grounded = bool(((-obs[:, 2]) < 0.5).all().item())
     c_ok = grounded and not bool(done.any().item())
     ok = ok and c_ok
-    print(f"[bfgym-test] C auto-reset restore: grounded={int(grounded)} "
+    print(f"[cudaflight-test] C auto-reset restore: grounded={int(grounded)} "
           f"dones={int(done.any().item())}")
 
-    print(f"[bfgym-test] {'PASS' if ok else 'FAIL'}")
+    print(f"[cudaflight-test] {'PASS' if ok else 'FAIL'}")
     env.close()
     return 0 if ok else 1
 

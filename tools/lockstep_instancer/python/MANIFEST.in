@@ -1,2 +1,2 @@
-graft src/bfgym_firmware/_data
+graft src/cudaflight/_data
 include README.md

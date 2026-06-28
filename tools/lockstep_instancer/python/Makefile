@@ -1,17 +1,17 @@
-# Build the bfgym-firmware wheel.
+# Build the cudaflight wheel.
 #
 #   make wheel        build the firmware then package
 #   make artifacts    just refresh the data files (skip wheel build)
-#   make firmware     just rebuild fw.fatbin / libbfgym.so
+#   make firmware     just rebuild fw.fatbin / libcudaflight.so
 #   make clean        wipe build/, dist/, and the bundled data files
 #
-# The wheel ships fw.fatbin and libbfgym.so under bfgym_firmware/_data/
+# The wheel ships fw.fatbin and libcudaflight.so under cudaflight/_data/
 # alongside the MAX7456 font from the firmware tree, so importlib.resources
 # resolves all runtime artifacts without reaching outside the wheel.
 
 ROOT       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../..)
 GPU_OUT    := $(ROOT)/obj/gpu
-DATA       := $(CURDIR)/src/bfgym_firmware/_data
+DATA       := $(CURDIR)/src/cudaflight/_data
 FONT_SRC   := $(ROOT)/src/platform/PICO/osd/font_betaflight.c
 BUILD_SH   := tools/lockstep_instancer/build_gpu.sh
 
@@ -23,12 +23,12 @@ PYTHON     ?= python3
 
 # Hosting: the wheel ships as a GitHub Release asset (not committed to git —
 # it is a 14MB arch-locked binary regenerated on every firmware build). Keep
-# VERSION in sync with pyproject.toml; the tag is namespaced (bfgym-v*) so it
+# VERSION in sync with pyproject.toml; the tag is namespaced (cudaflight-v*) so it
 # does not collide with the firmware-version release tags.
 VERSION    ?= 0.1.0
 REPO       ?= synaptech-solutions/cudaflight
-TAG        := bfgym-v$(VERSION)
-WHEEL      := dist/bfgym_firmware-$(VERSION)-py3-none-linux_x86_64.whl
+TAG        := cudaflight-v$(VERSION)
+WHEEL      := dist/cudaflight-$(VERSION)-py3-none-linux_x86_64.whl
 
 .PHONY: all wheel firmware artifacts clean release
 
@@ -39,7 +39,7 @@ firmware:
 
 artifacts: firmware
 	mkdir -p $(DATA)
-	cp $(GPU_OUT)/libbfgym.so $(DATA)/libbfgym.so
+	cp $(GPU_OUT)/libcudaflight.so $(DATA)/libcudaflight.so
 	cp $(GPU_OUT)/fw.fatbin   $(DATA)/fw.fatbin
 	cp $(FONT_SRC)            $(DATA)/font_betaflight.c
 
@@ -59,11 +59,11 @@ release: wheel
 	else \
 		echo "Creating release $(TAG)"; \
 		gh release create $(TAG) $(WHEEL) --repo $(REPO) \
-			--title "bfgym-firmware $(VERSION)" \
-			--notes "Prebuilt bfgym-firmware wheel (Linux x86_64, CUDA 12.x). pip install the asset URL directly."; \
+			--title "cudaflight $(VERSION)" \
+			--notes "Prebuilt cudaflight wheel (Linux x86_64, CUDA 12.x). pip install the asset URL directly."; \
 	fi
 	@echo "Installable from: https://github.com/$(REPO)/releases/download/$(TAG)/$(notdir $(WHEEL))"
 
 clean:
 	rm -rf build dist *.egg-info src/*.egg-info
-	rm -f $(DATA)/libbfgym.so $(DATA)/fw.fatbin $(DATA)/font_betaflight.c
+	rm -f $(DATA)/libcudaflight.so $(DATA)/fw.fatbin $(DATA)/font_betaflight.c

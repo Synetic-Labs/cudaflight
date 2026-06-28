@@ -1,25 +1,25 @@
-"""Oracle tests for BetaflightJaxEnv — same suite as test_bfgym.py (torch),
+"""Oracle tests for BetaflightJaxEnv — same suite as test_cudaflight.py (torch),
 driven through JAX arrays:
 
   A  determinism: fixed action sequence replays bit-exactly across reset
   B  closed-loop hover: a jnp P-controller holds 5m through step() alone
   C  crash + auto-reset: throttle cut raises dones, auto-reset restores
 
-Run: .venv/bin/python test_bfgym_jax.py [num_envs]
+Run: .venv/bin/python test_jax_env.py [num_envs]
 """
 
 import sys
 import time
 
-from bfgym_firmware.bfgym_jax import BetaflightJaxEnv, jnp
+from cudaflight.jax_env import BetaflightJaxEnv, jnp
 
 
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 256
-    print(f"[bfgym-jax] creating {n} instances (boot + settle + arm + snapshot)...")
+    print(f"[cudaflight-jax] creating {n} instances (boot + settle + arm + snapshot)...")
     t0 = time.time()
     env = BetaflightJaxEnv(n, auto_reset=False)
-    print(f"[bfgym-jax] created in {time.time() - t0:.1f}s: "
+    print(f"[cudaflight-jax] created in {time.time() - t0:.1f}s: "
           f"jax {__import__('jax').__version__}, device {env.device}")
     ok = True
 
@@ -38,7 +38,7 @@ def main():
     h2, o2 = burst()
     a_ok = h1 == h2 and bool(jnp.array_equal(o1, o2))
     ok = ok and a_ok
-    print(f"[bfgym-jax] A determinism-across-reset: {'bit-exact' if a_ok else 'FAILED'}")
+    print(f"[cudaflight-jax] A determinism-across-reset: {'bit-exact' if a_ok else 'FAILED'}")
 
     # B: jnp P-controller hover at 5m — closed loop, all on-device
     env.reset()
@@ -56,7 +56,7 @@ def main():
     mean_alt = float(alt.mean())
     b_ok = not any_done and in_band
     ok = ok and b_ok
-    print(f"[bfgym-jax] B jnp-P-controller hover: mean alt {mean_alt:.2f}m "
+    print(f"[cudaflight-jax] B jnp-P-controller hover: mean alt {mean_alt:.2f}m "
           f"after 10s, dones={int(any_done)}, in-band={int(in_band)} "
           f"({1000 * n / wall:,.0f} env-steps/s)")
 
@@ -69,16 +69,16 @@ def main():
         if bool(done.all()):
             crashed = True
             break
-    print(f"[bfgym-jax] C crash: all done after {i + 1} steps: {'yes' if crashed else 'NO'}")
+    print(f"[cudaflight-jax] C crash: all done after {i + 1} steps: {'yes' if crashed else 'NO'}")
     ok = ok and crashed
     obs, rew, done = env.step(throttle(0.36))
     grounded = bool(((-obs[:, 2]) < 0.5).all())
     c_ok = grounded and not bool(done.any())
     ok = ok and c_ok
-    print(f"[bfgym-jax] C auto-reset restore: grounded={int(grounded)} "
+    print(f"[cudaflight-jax] C auto-reset restore: grounded={int(grounded)} "
           f"dones={int(done.any())}")
 
-    print(f"[bfgym-jax] {'PASS' if ok else 'FAIL'}")
+    print(f"[cudaflight-jax] {'PASS' if ok else 'FAIL'}")
     env.close()
     return 0 if ok else 1
 

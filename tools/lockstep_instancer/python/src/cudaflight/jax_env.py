@@ -7,7 +7,7 @@ the GPU — actions are uploaded with one device-to-device copy, and the
 outputs are device-to-device snapshots of the live buffers (made via a
 zero-copy DLPack view; ~70 bytes/instance, negligible).
 
-XLA and libbfgym share the device's primary CUDA context, and every
+XLA and libcudaflight share the device's primary CUDA context, and every
 library call fully synchronizes the context on entry and exit, so XLA's
 non-blocking streams are ordered against the firmware kernels.
 
@@ -31,8 +31,8 @@ os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 import jax
 import jax.numpy as jnp
 
-from .bfgym_lib import default_fatbin_path as _default_fatbin
-from .bfgym_lib import load as _load
+from .lib import default_fatbin_path as _default_fatbin
+from .lib import load as _load
 
 # ---------------------------------------------------------------------------
 # Minimal DLPack producer for a raw CUDA device pointer, so jnp.from_dlpack
@@ -132,27 +132,27 @@ class BetaflightJaxEnv:
         cubin = str(cubin or _default_fatbin())
         # eeprom: boot-ready config image from the CPU --cli-dump converter
         # (e.g. a real quad's CLI dump); None boots defaults
-        self._h = self._lib.bfgym_create_eeprom(
+        self._h = self._lib.cudaflight_create_eeprom(
             cubin.encode(), num_envs, device_index, settle_ms,
             str(eeprom).encode() if eeprom else None)
         if not self._h:
-            raise RuntimeError(f"bfgym_create failed: {self._lib.bfgym_error().decode()}")
+            raise RuntimeError(f"cudaflight_create failed: {self._lib.cudaflight_error().decode()}")
 
-        self.num_envs = self._lib.bfgym_num_envs(self._h)
-        self.act_dim = self._lib.bfgym_act_dim(self._h)
-        self.obs_dim = self._lib.bfgym_obs_dim(self._h)
+        self.num_envs = self._lib.cudaflight_num_envs(self._h)
+        self.act_dim = self._lib.cudaflight_act_dim(self._h)
+        self.obs_dim = self._lib.cudaflight_obs_dim(self._h)
 
         n = self.num_envs
         self._obs_view = _DevicePointer(
-            self._lib.bfgym_obs_ptr(self._h), (n, self.obs_dim), _KDL_FLOAT, 32, device_index)
+            self._lib.cudaflight_obs_ptr(self._h), (n, self.obs_dim), _KDL_FLOAT, 32, device_index)
         self._rew_view = _DevicePointer(
-            self._lib.bfgym_rewards_ptr(self._h), (n,), _KDL_FLOAT, 32, device_index)
+            self._lib.cudaflight_rewards_ptr(self._h), (n,), _KDL_FLOAT, 32, device_index)
         self._done_view = _DevicePointer(
-            self._lib.bfgym_dones_ptr(self._h), (n,), _KDL_UINT, 8, device_index)
+            self._lib.cudaflight_dones_ptr(self._h), (n,), _KDL_UINT, 8, device_index)
 
     def _check(self, rc):
         if rc != 0:
-            raise RuntimeError(self._lib.bfgym_error().decode())
+            raise RuntimeError(self._lib.cudaflight_error().decode())
 
     def _snap(self, view):
         # zero-copy DLPack view of the live buffer, then an owned copy so
@@ -170,48 +170,48 @@ class BetaflightJaxEnv:
         actions = jax.block_until_ready(actions)
         try:
             ptr = actions.__cuda_array_interface__["data"][0]
-            self._check(self._lib.bfgym_write_actions(self._h, ptr))
+            self._check(self._lib.cudaflight_write_actions(self._h, ptr))
         except AttributeError:  # CAI export unavailable: bounce via host
             import numpy as np
             host = np.asarray(actions, dtype=np.float32)
-            self._check(self._lib.bfgym_write_actions_host(
+            self._check(self._lib.cudaflight_write_actions_host(
                 self._h, host.ctypes.data_as(ctypes.POINTER(ctypes.c_float))))
 
     def reset(self):
         """Restore every instance to the armed snapshot; returns obs."""
-        self._check(self._lib.bfgym_reset_all(self._h))
+        self._check(self._lib.cudaflight_reset_all(self._h))
         self._upload_actions(jnp.zeros((self.num_envs, self.act_dim), jnp.float32))
-        self._check(self._lib.bfgym_step(self._h, 0))  # refresh obs, no sim advance
+        self._check(self._lib.cudaflight_step(self._h, 0))  # refresh obs, no sim advance
         return self._snap(self._obs_view)
 
     def step(self, actions):
         """Advance decimation control steps; returns (obs, rewards, dones)."""
         self._upload_actions(actions)
-        self._check(self._lib.bfgym_step(self._h, self.decimation))
+        self._check(self._lib.cudaflight_step(self._h, self.decimation))
         out = self._outputs()
         if self.auto_reset:
-            self._check(self._lib.bfgym_reset_done(self._h))
+            self._check(self._lib.cudaflight_reset_done(self._h))
         return out
 
     def reset_mask(self, mask):
         """Restore instances where mask ([N] bool/uint8) is nonzero."""
         mask = jax.block_until_ready(jnp.asarray(mask, jnp.uint8))
-        self._check(self._lib.bfgym_reset_mask(
+        self._check(self._lib.cudaflight_reset_mask(
             self._h, mask.__cuda_array_interface__["data"][0]))
 
     def snapshot(self):
         """Retake the episode-start snapshot at the current state."""
-        self._check(self._lib.bfgym_snapshot(self._h))
+        self._check(self._lib.cudaflight_snapshot(self._h))
 
     def hashes(self):
         """Per-instance motor-trace hashes (the determinism oracle)."""
         out = (ctypes.c_uint64 * self.num_envs)()
-        self._check(self._lib.bfgym_hashes(self._h, out))
+        self._check(self._lib.cudaflight_hashes(self._h, out))
         return list(out)
 
     def close(self):
         if getattr(self, "_h", None):
-            self._lib.bfgym_destroy(self._h)
+            self._lib.cudaflight_destroy(self._h)
             self._h = None
 
     def __del__(self):
