@@ -1,0 +1,119 @@
+diff --git a/enzyme/Enzyme/AdjointGenerator.h b/enzyme/Enzyme/AdjointGenerator.h
+index 5dbeb27..d294616 100644
+--- a/enzyme/Enzyme/AdjointGenerator.h
++++ b/enzyme/Enzyme/AdjointGenerator.h
+@@ -5957,9 +5957,30 @@ public:
+         for (size_t i = 0; i < argsInverted.size(); i++) {
+           if (subdata->constant_args[i] == argsInverted[i])
+             continue;
+-          assert(subdata->constant_args[i] == DIFFE_TYPE::DUP_ARG);
+-          assert(argsInverted[i] == DIFFE_TYPE::DUP_NONEED);
+-          argsInverted[i] = DIFFE_TYPE::DUP_ARG;
++          auto aug = subdata->constant_args[i];
++          auto rev = argsInverted[i];
++          auto isDup = [](DIFFE_TYPE t) {
++            return t == DIFFE_TYPE::DUP_ARG || t == DIFFE_TYPE::DUP_NONEED;
++          };
++          // The reverse must match the augmented primal that was actually
++          // built (its tape layout / shadow-argument signature is fixed).
++          // DUP_ARG and DUP_NONEED share the same signature ("same as DUP_ARG
++          // otherwise"), so any dup/dup mismatch is reconcilable by adopting
++          // the augmented's choice. Activity analysis can legitimately differ
++          // between the augmented and gradient sweeps of a caller (e.g. when a
++          // value's activity is threaded through globals), so this is not an
++          // error.
++          if (isDup(aug) && isDup(rev)) {
++            argsInverted[i] = aug;
++            continue;
++          }
++          llvm::errs() << "Enzyme: reconciling arg #" << i << " of call to "
++                       << called->getName() << " in "
++                       << gutils->oldFunc->getName()
++                       << ": augmented=" << to_string(aug)
++                       << " gradient=" << to_string(rev)
++                       << " -> adopting augmented\n";
++          argsInverted[i] = aug;
+         }
+       }
+ 
+diff --git a/enzyme/Enzyme/GradientUtils.cpp b/enzyme/Enzyme/GradientUtils.cpp
+index 357602a..affcd60 100644
+--- a/enzyme/Enzyme/GradientUtils.cpp
++++ b/enzyme/Enzyme/GradientUtils.cpp
+@@ -5347,6 +5347,14 @@ Value *GradientUtils::invertPointerM(Value *const oval, IRBuilder<> &BuilderM,
+       return Constant::getNullValue(getShadowType(oval->getType()));
+     else
+       return applyChainRule(oval->getType(), BuilderM, [&]() { return oval; });
++  } else if (isa<ConstantAggregateZero>(oval)) {
++    // All-zero data has an all-zero shadow regardless of element types: zero
++    // floats carry zero derivative and zero pointers are null. Handle this
++    // independently of TypeTree, which under loose-types may not have proven
++    // the aggregate floating-point (otherwise this falls through to the
++    // generic path and emits a non-constant load, which is invalid e.g. as a
++    // global's shadow initializer).
++    return Constant::getNullValue(getShadowType(oval->getType()));
+   } else if (auto CD = dyn_cast<ConstantDataArray>(oval)) {
+     SmallVector<Constant *, 1> Vals;
+     auto ElTy = CD->getType()->getElementType();
+@@ -5916,7 +5924,12 @@ Value *GradientUtils::invertPointerM(Value *const oval, IRBuilder<> &BuilderM,
+ 
+         auto rule = [&bb, &arg, &invertargs](Value *ip) {
+           // TODO mark this the same inbounds as the original
+-          return bb.CreateGEP(cast<GEPOperator>(ip)->getSourceElementType(), ip,
++          // The source element type comes from the original constant GEP
++          // (`arg`), not from the inverted base pointer `ip`: `ip` is the
++          // shadow of operand 0 and is generally NOT itself a GEP (it may be a
++          // global, bitcast, addrspacecast, phi, ...), so cast<GEPOperator>(ip)
++          // would assert. Mirror the GetElementPtrInst path below.
++          return bb.CreateGEP(cast<GEPOperator>(arg)->getSourceElementType(), ip,
+                               invertargs, arg->getName() + "'ipg");
+         };
+ 
+diff --git a/enzyme/Enzyme/PreserveNVVM.cpp b/enzyme/Enzyme/PreserveNVVM.cpp
+index 8c98c0d..05a4a02 100644
+--- a/enzyme/Enzyme/PreserveNVVM.cpp
++++ b/enzyme/Enzyme/PreserveNVVM.cpp
+@@ -510,6 +510,12 @@ bool preserveNVVM(bool Begin, Module &M) {
+         }
+         if (auto GV = cast<GlobalVariable>(V)) {
+           GV->setMetadata("enzyme_inactive", MDNode::get(g.getContext(), {}));
++          // A frozen (inactive) global is constant w.r.t. the derivative, so
++          // its pointee types never matter — also stop TypeAnalysis recursing
++          // into it. Without this, an inactive but union-laden state struct
++          // (pidRuntime, mixerRuntime, ...) makes TA's fixpoint diverge once it
++          // is inlined into the differentiated function.
++          GV->setMetadata("enzyme_ta_norecur", MDNode::get(g.getContext(), {}));
+           toErase.push_back(&g);
+           changed = true;
+         } else {
+diff --git a/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp b/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
+index 68f8183..a823b0f 100644
+--- a/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
++++ b/enzyme/Enzyme/TypeAnalysis/TypeAnalysis.cpp
+@@ -898,6 +898,26 @@ void getConstantAnalysis(Constant *Val, TypeAnalyzer &TA,
+       Result |= analysis[GV->getInitializer()].Only(-1, nullptr);
+       return;
+     }
++    // A mutable global marked enzyme_ta_norecur is frozen by updateAnalysis (it
++    // returns early, never refining the pointee). For a homogeneous scalar
++    // (array/vector of) FP global -- e.g. @motor = [8 x float] -- seed the
++    // pointee type straight from the LLVM value type so the frozen type is the
++    // correct {[-1,-1]:Float} rather than an unknown pointee. Without this the
++    // motor-output adjoint never flows back through mixTable's stores (the
++    // reverse pass sees an untyped store and emits no shadow load). norecur is
++    // used precisely because deriving this type via the fixpoint does not
++    // terminate (variable-index array GEPs oscillate the TypeTree encoding).
++    if (hasMetadata(GV, "enzyme_ta_norecur")) {
++      llvm::Type *VT = GV->getValueType();
++      while (auto *AT = dyn_cast<ArrayType>(VT))
++        VT = AT->getElementType();
++      if (VT->isFPOrFPVectorTy()) {
++        Result |= TypeTree(ConcreteType(VT->getScalarType()))
++                      .Only(-1, nullptr)
++                      .Only(-1, nullptr);
++        return;
++      }
++    }
+     if (!isa<StructType>(GV->getValueType()) ||
+         !cast<StructType>(GV->getValueType())->isOpaque()) {
+       auto globalSize = (DL.getTypeSizeInBits(GV->getValueType()) + 7) / 8;
