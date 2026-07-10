@@ -470,6 +470,18 @@ void bflConfigureArmSwitch(void)
     analyzeModeActivationConditions();
 }
 
+// Map ANGLE (self-levelling) to AUX2 high (equivalent of CLI:
+// aux 1 1 1 1700 2100 0 0). AUX2 low => acro (rate) mode, the FPV default.
+// Firmware-side for the same reason as bflConfigureArmSwitch.
+void bflConfigureModeSwitch(void)
+{
+    modeActivationConditionsMutable(1)->modeId = BOXANGLE;
+    modeActivationConditionsMutable(1)->auxChannelIndex = 1;
+    modeActivationConditionsMutable(1)->range.startStep = CHANNEL_VALUE_TO_STEP(1700);
+    modeActivationConditionsMutable(1)->range.endStep = CHANNEL_VALUE_TO_STEP(2100);
+    analyzeModeActivationConditions();
+}
+
 // Firmware-eye view of the active instance, for harness debugging.
 void bflDebugStatus(void)
 {

@@ -73,6 +73,9 @@ bool bflIsArmed(void);
 // Map ARM to AUX1 high in the active instance's config.
 void bflConfigureArmSwitch(void);
 
+// Map ANGLE (self-levelling) to AUX2 high; AUX2 low = acro (rate) mode.
+void bflConfigureModeSwitch(void);
+
 // Print the active instance's RC/arming/calibration state (debug aid).
 void bflDebugStatus(void);
 
