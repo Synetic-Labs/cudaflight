@@ -55,6 +55,11 @@ ubuntu*.log
 # EEPROM image file (created by SITL)
 eeprom.bin
 
+__pycache__/
+
+# Local Enzyme checkout (upstream clone + patches; see tools/enzyme_patches/)
+/tools/Enzyme/
+
 # config used for building targets
 # changed to submodule
 #/src/config
