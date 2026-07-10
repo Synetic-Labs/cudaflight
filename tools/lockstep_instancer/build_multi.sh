@@ -38,7 +38,9 @@ while IFS= read -r cmd; do
     fi
     obj=$(sed -E 's/.* -c -o ([^ ]+) .*/\1/' <<<"$cmd")
     bc=$OUT/bc/$(sed 's|obj/main/SITL_LOCKSTEP/||; s|\.o$|.bc|; s|/|__|g' <<<"$obj")
-    sed -E "s@ -c -o [^ ]+ @ -c -emit-llvm -o $bc @" <<<"$cmd" >> "$OUT/bc_jobs.txt"
+    # -fPIC so the same bitcode also codegens cleanly into libcpuflight.so
+    # (PIC objects link fine into the PIE test binary too)
+    sed -E "s@ -c -o [^ ]+ @ -fPIC -c -emit-llvm -o $bc @" <<<"$cmd" >> "$OUT/bc_jobs.txt"
     echo "$bc" >> "$OUT/bc_list.txt"
 done
 xargs -d '\n' -P "$(nproc)" -n 1 bash -c < "$OUT/bc_jobs.txt"
@@ -48,12 +50,12 @@ echo "== llvm-link + instancer + codegen"
 llvm-link $(cat "$OUT/bc_list.txt") -o "$OUT/fw.bc"
 "$INSTANCER" "$OUT/fw.bc" "$OUT/fw_inst.bc"
 # CPU definition of __bf_delta_load(), inlined into the firmware module
-clang -O2 -c -emit-llvm tools/lockstep_instancer/delta_cpu.c -o "$OUT/delta_cpu.bc"
+clang -O2 -fPIC -c -emit-llvm tools/lockstep_instancer/delta_cpu.c -o "$OUT/delta_cpu.bc"
 llvm-link "$OUT/fw_inst.bc" "$OUT/delta_cpu.bc" -o "$OUT/fw_final.bc"
 # function/data sections so the final --gc-sections can strip dead code,
 # matching the per-TU build (some firmware references resolve to nothing
 # on SITL and only link because they are unreachable)
-clang -O2 -ffunction-sections -fdata-sections -c "$OUT/fw_final.bc" -o "$OUT/fw_inst.o"
+clang -O2 -fPIC -ffunction-sections -fdata-sections -c "$OUT/fw_final.bc" -o "$OUT/fw_inst.o"
 
 echo "== linking"
 linkcmd=$(grep -E '^clang -o obj/main/betaflight_SITL_LOCKSTEP\.elf' "$OUT/cmds.txt" | head -1)
@@ -65,4 +67,31 @@ clang -o "$OUT/betaflight_SITL_LOCKSTEP_MULTI" \
     obj/main/SITL_LOCKSTEP/SIMULATOR/sitl_lockstep_instance.o \
     $flags
 
-echo "== done: $OUT/betaflight_SITL_LOCKSTEP_MULTI"
+echo "== linking libcpuflight.so"
+# The CPU fleet shared library (cpuflight.c): same instanced firmware module,
+# harness objects recompiled -fPIC with their exact harvested flags, no main.
+for src in sitl_lockstep_physics sitl_lockstep_instance; do
+    cmd=$(grep -E " -c -o obj/main/SITL_LOCKSTEP/SIMULATOR/${src}\.o " "$OUT/cmds.txt" \
+          | sed 's/^echo[^&]*&& //' | head -1)
+    if [ -z "$cmd" ]; then
+        echo "no harvested compile command for ${src}.c" >&2
+        exit 1
+    fi
+    sed -E "s@ -c -o [^ ]+ @ -fPIC -c -o $OUT/${src}_pic.o @" <<<"$cmd" | bash
+done
+clang -O2 -fPIC -c tools/lockstep_instancer/cpuflight.c -o "$OUT/cpuflight_pic.o"
+# Export only the cpuflight_* API. Localizing everything else lets
+# --gc-sections strip unreachable firmware code exactly like the executable
+# link does — without it, dead references (symbols that only link because
+# they are unreachable) survive into the .so and break dlopen.
+printf '{ global: cpuflight_*; local: *; };\n' > "$OUT/cpuflight.map"
+clang -shared -o "$OUT/libcpuflight.so" \
+    "$OUT/fw_inst.o" \
+    "$OUT/sitl_lockstep_physics_pic.o" \
+    "$OUT/sitl_lockstep_instance_pic.o" \
+    "$OUT/cpuflight_pic.o" \
+    -lm -lpthread -lc -lrt -Wl,-z,noexecstack \
+    -Wl,--gc-sections -Wl,--version-script="$OUT/cpuflight.map" \
+    -T./src/platform/SIMULATOR/link/sitl.ld
+
+echo "== done: $OUT/betaflight_SITL_LOCKSTEP_MULTI + $OUT/libcpuflight.so"

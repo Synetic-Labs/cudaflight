@@ -124,3 +124,19 @@ void bflInstanceActivate(unsigned idx)
         __bf_delta = (uint64_t)(blobs[idx] - __bf_image);
     }
 }
+
+char *bflInstanceBlob(unsigned idx)
+{
+    return idx < blobCount ? blobs[idx] : NULL;
+}
+
+void bflInstancesDestroy(void)
+{
+    for (unsigned i = 0; i < blobCount; i++) {
+        free(blobs[i]);
+    }
+    free(blobs);
+    blobs = NULL;
+    blobCount = 0;
+    __bf_delta = 0;
+}

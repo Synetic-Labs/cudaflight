@@ -25,7 +25,7 @@ PYTHON     ?= python3
 # it is a 14MB arch-locked binary regenerated on every firmware build). Keep
 # VERSION in sync with pyproject.toml; the tag is namespaced (cudaflight-v*) so it
 # does not collide with the firmware-version release tags.
-VERSION    ?= 0.2.0
+VERSION    ?= 0.2.1
 REPO       ?= synaptech-solutions/cudaflight
 TAG        := cudaflight-v$(VERSION)
 WHEEL      := dist/cudaflight-$(VERSION)-py3-none-linux_x86_64.whl
@@ -37,10 +37,16 @@ all: wheel
 firmware:
 	cd $(ROOT) && bash $(BUILD_SH)
 
-artifacts: firmware
+# CPU SITL fleet library (libcpuflight.so) — the no-CUDA backend for small
+# fleets (cudaflight refuses n < 3; see discoverRelocs).
+firmware-cpu:
+	cd $(ROOT) && bash tools/lockstep_instancer/build_multi.sh
+
+artifacts: firmware firmware-cpu
 	mkdir -p $(DATA)
 	cp $(GPU_OUT)/libcudaflight.so $(DATA)/libcudaflight.so
 	cp $(GPU_OUT)/fw.fatbin   $(DATA)/fw.fatbin
+	cp $(ROOT)/obj/multi/libcpuflight.so $(DATA)/libcpuflight.so
 	cp $(FONT_SRC)            $(DATA)/font_betaflight.c
 
 wheel: artifacts

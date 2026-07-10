@@ -48,3 +48,13 @@ int bflInstancesCreate(unsigned count);
 void bflInstanceActivate(unsigned idx);
 
 size_t bflInstanceImageSize(void);
+
+// Instance `idx`'s image copy (NULL if out of range). CPU blobs never move,
+// so a byte snapshot restored to the same blob needs no pointer rebasing —
+// the basis of cpuflight's episode reset.
+char *bflInstanceBlob(unsigned idx);
+
+// Free every instance image and deactivate instancing (delta back to the
+// template). The template itself is never booted, so a subsequent
+// bflInstancesCreate() starts from pristine state again.
+void bflInstancesDestroy(void);

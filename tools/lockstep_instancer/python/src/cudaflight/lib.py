@@ -1,9 +1,11 @@
-"""ctypes binding for libcudaflight.so and artifact resolution.
+"""ctypes bindings for libcudaflight.so / libcpuflight.so and artifact resolution.
 
-The packaged wheel ships its own ``libcudaflight.so`` and ``fw.fatbin`` under
+The packaged wheel ships its own ``libcudaflight.so``, ``fw.fatbin`` and
+``libcpuflight.so`` (the CPU SITL fleet, for small no-CUDA fleets) under
 ``cudaflight/_data/``; ``importlib.resources`` returns those by default.
-Both can be overridden via the ``CUDAFLIGHT_LIB`` / ``CUDAFLIGHT_FATBIN`` environment
-variables for ad-hoc rebuilds without reinstalling the wheel.
+All can be overridden via the ``CUDAFLIGHT_LIB`` / ``CUDAFLIGHT_FATBIN`` /
+``CPUFLIGHT_LIB`` environment variables for ad-hoc rebuilds without
+reinstalling the wheel.
 """
 
 import ctypes
@@ -114,4 +116,52 @@ def load(lib_path=None) -> ctypes.CDLL:
     for name in ("cudaflight_grid", "cudaflight_block"):
         getattr(lib, name).restype = ctypes.c_uint32
         getattr(lib, name).argtypes = [ctypes.c_void_p]
+    return lib
+
+
+def default_cpu_lib_path() -> Path:
+    env = os.environ.get("CPUFLIGHT_LIB")
+    return Path(env) if env else _resource("libcpuflight.so")
+
+
+def load_cpu(lib_path=None) -> ctypes.CDLL:
+    """ctypes binding for libcpuflight.so — the CPU SITL twin of the
+    external-physics API (cpuflight.c). No CUDA and no minimum fleet size
+    (cudaflight refuses n < 3: the runtime relocation table cannot be
+    discovered below 3 instances). Instances step sequentially in-process,
+    so this is the right backend for small interactive fleets, not
+    training-scale ones. Overridable via CPUFLIGHT_LIB."""
+    path = Path(lib_path) if lib_path else default_cpu_lib_path()
+    if not path.exists():
+        raise FileNotFoundError(
+            f"libcpuflight.so not found at {path}; rebuild the cudaflight wheel "
+            "(`make wheel` in tools/lockstep_instancer/python/) or set "
+            "CPUFLIGHT_LIB to a built libcpuflight.so")
+    lib = ctypes.CDLL(str(path))
+    lib.cpuflight_error.restype = ctypes.c_char_p
+    lib.cpuflight_create.restype = ctypes.c_void_p
+    lib.cpuflight_create.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    # eeprom_path: boot-ready config image (None boots defaults), same
+    # converter output cudaflight_create_eeprom takes.
+    lib.cpuflight_create_eeprom.restype = ctypes.c_void_p
+    lib.cpuflight_create_eeprom.argtypes = [ctypes.c_uint32, ctypes.c_uint32,
+                                            ctypes.c_char_p]
+    for name in ("cpuflight_num_envs", "cpuflight_act_dim", "cpuflight_aux_dim"):
+        getattr(lib, name).restype = ctypes.c_uint32
+        getattr(lib, name).argtypes = [ctypes.c_void_p]
+    # fw_step(h, actions[n,4] f32, sensors[n,7] f32, motors[n,4] f32 out,
+    #         armed[n] u8 out, substeps)
+    lib.cpuflight_fw_step.restype = ctypes.c_int
+    lib.cpuflight_fw_step.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_uint8),
+        ctypes.c_uint32]
+    lib.cpuflight_set_aux.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
+    lib.cpuflight_snapshot.restype = ctypes.c_int
+    lib.cpuflight_snapshot.argtypes = [ctypes.c_void_p]
+    lib.cpuflight_reset_mask.restype = ctypes.c_int
+    lib.cpuflight_reset_mask.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8)]
+    lib.cpuflight_reset_all.argtypes = [ctypes.c_void_p]
+    lib.cpuflight_destroy.argtypes = [ctypes.c_void_p]
     return lib

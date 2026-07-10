@@ -144,9 +144,19 @@ static int writeGlobal(cudaflight *g, const char *name, const void *src, size_t 
 static int discoverRelocs(cudaflight *g)
 {
     if (g->n < 3) {
-        fprintf(stderr, "[cudaflight-reloc] need >=3 instances to discover relocs; "
-                        "skipped (n=%u)\n", g->n);
-        return 0;
+        // No skip-and-continue here: without the full table, rebase-on-move is a
+        // silent no-op and value-threaded blobs lose every runtime-written
+        // self-pointer (the gyro/acc dataReady handshake among them) — the fleet
+        // boots fine but rate feedback is dead. Refuse creation instead.
+        snprintf(g_err, sizeof(g_err),
+                 "fleet size %u is too small for cudaflight: discovering the runtime "
+                 "relocation table needs >=3 identically-booted instances, and without "
+                 "it firmware state cannot be rebased (sensors silently stop reaching "
+                 "the PID). For small fleets use the bundled CPU SITL backend "
+                 "(cudaflight.lib.load_cpu / libcpuflight.so) — it is faster than the "
+                 "GPU at this fleet size anyway.", g->n);
+        fprintf(stderr, "[cudaflight-reloc] FAIL: %s\n", g_err);
+        return -1;
     }
     const uint64_t stride = g->stride;
     const uint64_t base = (uint64_t)g->instBuf;
