@@ -98,8 +98,14 @@ static inline void bfRebaseSelf(bfFlight_t *s, char *bp)
 const uint64_t __bf_state_size = sizeof(bfFlight_t);
 #define BF_ACT_DIM 4
 #define BF_OBS_DIM 17
+// AUX channels (rc[4..]) the host can drive for manual / free flight:
+// AUX1 = arm, AUX2 = flight mode. Kept separate from the AETR action vector so
+// BF_ACT_DIM (and the whole RL action interface) is unchanged — only the host
+// cudaflight_fw_step path writes these, via bfSetAux.
+#define BF_AUX_DIM 4
 const uint64_t __bf_act_dim = BF_ACT_DIM;
 const uint64_t __bf_obs_dim = BF_OBS_DIM;
+const uint64_t __bf_aux_dim = BF_AUX_DIM;
 
 static inline unsigned self(void)
 {
@@ -188,8 +194,10 @@ KERNEL void bfBoot(bfFlight_t *st)
     initPhase2();
     initPhase3();
 
-    // Map ARM to AUX1 high (firmware-side helper, see header note)
+    // Map ARM to AUX1 high and ANGLE to AUX2 high (firmware-side helpers).
+    // AUX1 low disarms; AUX2 low = acro (rate), high = angle (self-levelling).
     bflConfigureArmSwitch();
+    bflConfigureModeSwitch();
 
     // OSD: demo element layout for layout-less configs, and a per-instance
     // craft name so wall tiles are tellable apart (config names win)
@@ -403,6 +411,29 @@ KERNEL void bfFwStep(bfFlight_t *st, const float *actions, const float *sensors,
 
     bflGetMotorsNormalised(&motors[(uint64_t)k * 4], 4);
     armed[k] = bflIsArmed() ? 1 : 0;
+}
+
+// Host-driven AUX channels for manual / free flight: copy AUX1.. (rc[4..]) from
+// a per-instance buffer of RC microsecond values, so the radio's arm switch
+// (AUX1) and flight-mode switch (AUX2) take effect. The AETR action vector is
+// unchanged (BF_ACT_DIM stays 4), so the RL path is untouched — the host only
+// launches this from cudaflight_fw_step(), ahead of bfFwStep. The firmware already
+// forwards rc[4..] to the FC every substep, and ARM/ANGLE are bound to
+// AUX1/AUX2 at boot. Touches per-instance state only (no blob pointers), so no
+// rebase is needed.
+KERNEL void bfSetAux(bfFlight_t *st, const float *aux)
+{
+    const unsigned k = self();
+    if (k >= __bf_inst_count) {
+        return;
+    }
+    bfFlight_t *s = &st[k];
+    const float *au = &aux[(uint64_t)k * BF_AUX_DIM];
+    for (int i = 0; i < BF_AUX_DIM && (4 + i) < BFL_MAX_RC_CHANNELS; i++) {
+        float us = au[i];
+        us = us < 1000.0f ? 1000.0f : (us > 2000.0f ? 2000.0f : us);
+        s->rc[4 + i] = (uint16_t)us;
+    }
 }
 
 // Set the per-launch instance base. The pure (value-threaded) FFI path threads

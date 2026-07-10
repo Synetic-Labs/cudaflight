@@ -213,7 +213,7 @@ echo "== instancer + link"
 AD_IN="$OUT/whole.bc"
 
 echo "== internalize + DCE + codegen"
-KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfFwStepGrad,bfFwStepGradFD,bfFwStepJacFD,bfFwStepJacFDPure,bfFwStepJacGradPure,bfRateEval,bfLoadEeprom,bfOsdSnapshot,bfSetBase,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build,__bf_full_relocs,__bf_full_reloc_count"
+KEEP="bfInstanceInit,bfBoot,bfRun,bfFinish,bfSnapshot,bfReset,bfStep,bfFwStep,bfSetAux,bfFwStepGrad,bfFwStepGradFD,bfFwStepJacFD,bfFwStepJacFDPure,bfFwStepJacGradPure,bfRateEval,bfLoadEeprom,bfOsdSnapshot,bfSetBase,__bf_image,__bf_image_size,__bf_image_align,__bf_state_size,__bf_act_dim,__bf_obs_dim,__bf_aux_dim,__bf_osd_rows,__bf_osd_cols,__bf_inst_base,__bf_inst_stride,__bf_inst_count,__bf_relocs,__bf_reloc_count,__bf_instanced_build,__bf_full_relocs,__bf_full_reloc_count"
 "$OPT" -passes='internalize,globaldce' -internalize-public-api-list="$KEEP" \
     "$AD_IN" -o "$OUT/whole_dce.bc"
 # Per-arch codegen: emit one PTX + cubin per SM in $ARCHS, then combine

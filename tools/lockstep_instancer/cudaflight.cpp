@@ -47,14 +47,16 @@ struct cudaflight {
     CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep, fFwStep;
     CUfunction fOsd, fGradFD, fRateEval, fJacFD, fSetBase, fGrad;
     CUfunction fJacFDPure, fJacGradPure;  // value-threaded (rebase-aware) Jacobians
+    CUfunction fSetAux;             // host-driven AUX RC channels (optional)
     uint32_t n;
     unsigned grid, block;
-    uint64_t imageSize, stride, stateSize, actDim, obsDim;
+    uint64_t imageSize, stride, stateSize, actDim, obsDim, auxDim;
     uint64_t osdRows, osdCols;
     CUdeviceptr instBuf, stateBuf, snapBuf, snapStBuf;
     CUdeviceptr actBuf, obsBuf, rewBuf, doneBuf;
     CUdeviceptr hashBuf, altBuf, armedBuf;
     CUdeviceptr sensBuf, motorBuf;  // external-physics exchange: [n x 7] in, [n x 4] out
+    CUdeviceptr auxBuf;             // host-driven AUX RC channels: [n x auxDim] us floats
     CUdeviceptr osdBuf, osdAttrBuf; // OSD char grids: [n x rows*cols] u8 each
     CUdeviceptr seedBuf, dactBuf;   // FD gradient: [n x 4] motor cotangent in, [n x 4] action grad out
     CUdeviceptr gradScratch;        // [n x stride] per-instance blob save for FD restore
@@ -227,7 +229,8 @@ void cudaflight_destroy(cudaflight *g)
                            g->actBuf, g->obsBuf, g->rewBuf, g->doneBuf,
                            g->hashBuf, g->altBuf, g->armedBuf,
                            g->sensBuf, g->motorBuf, g->osdBuf, g->osdAttrBuf,
-                           g->seedBuf, g->dactBuf, g->gradScratch, g->fullRelocBuf }) {
+                           g->seedBuf, g->dactBuf, g->gradScratch, g->fullRelocBuf,
+                           g->auxBuf }) {
         if (p) {
             cuMemFree(p);
         }
@@ -313,6 +316,14 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
     g->stateSize = readU64(g, "__bf_state_size", &err);
     g->actDim = readU64(g, "__bf_act_dim", &err);
     g->obsDim = readU64(g, "__bf_obs_dim", &err);
+    // AUX RC channels are optional: a module built before bfSetAux lacks
+    // __bf_aux_dim, so read it with a separate flag and degrade to "no aux"
+    // rather than failing create.
+    int auxErr = 0;
+    g->auxDim = readU64(g, "__bf_aux_dim", &auxErr);
+    if (auxErr) {
+        g->auxDim = 0;
+    }
     g->osdRows = readU64(g, "__bf_osd_rows", &err);
     g->osdCols = readU64(g, "__bf_osd_cols", &err);
     if (err) {
@@ -351,6 +362,21 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
     if (!ok) {
         cudaflight_destroy(g);
         return nullptr;
+    }
+
+    // AUX channel buffer (manual / free flight). Default AUX1 high (1800us =
+    // armed), the rest low (1000us) — so a fw step that never calls set_aux
+    // keeps the auto-armed, acro behaviour the RL path relies on.
+    if (g->auxDim) {
+        std::vector<float> aux(g->auxDim * (size_t)n, 1000.0f);
+        for (uint32_t k = 0; k < n; k++) {
+            aux[(size_t)k * g->auxDim] = 1800.0f; // AUX1 = arm
+        }
+        if (!cuOk(cuMemAlloc(&g->auxBuf, 4 * g->auxDim * n), "alloc aux") ||
+            !cuOk(cuMemcpyHtoD(g->auxBuf, aux.data(), 4 * g->auxDim * (size_t)n), "init aux")) {
+            cudaflight_destroy(g);
+            return nullptr;
+        }
     }
 
     // Differentiable-rollout scratch — only when requested. gradScratch alone is
@@ -399,6 +425,8 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
     cuModuleGetFunction(&g->fRateEval, g->mod, "bfRateEval");
     cuModuleGetFunction(&g->fJacFD, g->mod, "bfFwStepJacFD");
     cuModuleGetFunction(&g->fSetBase, g->mod, "bfSetBase");
+    // Optional: the AUX-channel writer (present when built with bfSetAux).
+    cuModuleGetFunction(&g->fSetAux, g->mod, "bfSetAux");
     // Optional: the Enzyme reverse-mode VJP kernel (present when built DIFF=1).
     cuModuleGetFunction(&g->fGrad, g->mod, "bfFwStepGrad");
 
@@ -620,9 +648,46 @@ int cudaflight_write_sensors_host(cudaflight *g, const float *src)
 int cudaflight_fw_step(cudaflight *g, uint32_t substeps)
 {
     CtxGuard guard(g->ctx);
+    // Apply host-driven AUX channels (arm / flight mode) before stepping, if the
+    // module supports them. No-op for the RL path, which never writes auxBuf
+    // (it stays at the armed-on-create default).
+    if (g->fSetAux && g->auxDim && g->auxBuf) {
+        void *auxArgs[] = { &g->stateBuf, &g->auxBuf };
+        if (launch(g, g->fSetAux, auxArgs)) {
+            return -1;
+        }
+    }
     void *args[] = { &g->stateBuf, &g->actBuf, &g->sensBuf, &g->motorBuf,
                      &g->armedBuf, &substeps };
     return launch(g, g->fFwStep, args);
+}
+
+// AUX RC channels for manual / free flight (arm switch, flight mode, ...). The
+// buffer is [n x aux_dim] float32 RC microsecond values (1000..2000); bfSetAux
+// copies it into each instance's rc[4..] before the fw step. cudaflight_aux_dim()
+// returns 0 if the loaded module predates AUX support.
+uint32_t cudaflight_aux_dim(cudaflight *g) { return (uint32_t)g->auxDim; }
+uint64_t cudaflight_aux_ptr(cudaflight *g) { return (uint64_t)g->auxBuf; }
+
+int cudaflight_write_aux(cudaflight *g, uint64_t src_devptr)
+{
+    CtxGuard guard(g->ctx);
+    if (!g->auxBuf || !g->auxDim) {
+        return 0;
+    }
+    CUTRY(cuMemcpyDtoD(g->auxBuf, (CUdeviceptr)src_devptr, 4 * g->auxDim * g->n));
+    CUTRY(cuCtxSynchronize());
+    return 0;
+}
+
+int cudaflight_write_aux_host(cudaflight *g, const float *src)
+{
+    CtxGuard guard(g->ctx);
+    if (!g->auxBuf || !g->auxDim) {
+        return 0;
+    }
+    CUTRY(cuMemcpyHtoD(g->auxBuf, src, 4 * g->auxDim * g->n));
+    return 0;
 }
 
 // ---------------------------------------------------------------------------

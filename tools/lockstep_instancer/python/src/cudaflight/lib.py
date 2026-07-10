@@ -76,6 +76,16 @@ def load(lib_path=None) -> ctypes.CDLL:
     lib.cudaflight_fw_step.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
     lib.cudaflight_write_sensors.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
     lib.cudaflight_write_sensors_host.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
+    # AUX RC channels (arm switch, flight mode) for manual / free flight.
+    # Guarded for older libcudaflight.so without AUX support; cudaflight_aux_dim
+    # returns 0 there.
+    if hasattr(lib, "cudaflight_aux_dim"):
+        lib.cudaflight_aux_dim.restype = ctypes.c_uint32
+        lib.cudaflight_aux_dim.argtypes = [ctypes.c_void_p]
+        lib.cudaflight_aux_ptr.restype = ctypes.c_uint64
+        lib.cudaflight_aux_ptr.argtypes = [ctypes.c_void_p]
+        lib.cudaflight_write_aux.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
+        lib.cudaflight_write_aux_host.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
     for name in ("cudaflight_reset_done", "cudaflight_reset_all", "cudaflight_snapshot", "cudaflight_sync"):
         getattr(lib, name).argtypes = [ctypes.c_void_p]
     lib.cudaflight_hashes.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint64)]
