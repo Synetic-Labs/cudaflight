@@ -1,0 +1,143 @@
+# BetaFPV Air75 "wisp" — sim-adapted CLI dump.
+#
+# Source: BTFL_cli_AIR75_20260625_164332_BETAFPVG473.txt (Betaflight 4.5.0 /
+# STM32G47X / BETAFPVG473, commit c155f5830), translated for the
+# SITL_LOCKSTEP master build. Convert to a boot-ready EEPROM image with:
+#
+#   obj/multi/betaflight_SITL_LOCKSTEP_MULTI \
+#       --cli-dump tools/lockstep_instancer/configs/air75/air75_wisp_sim.txt \
+#       --eeprom obj/configs/air75_wisp.bin
+#
+# This is the same translation scheme as air75_sim.txt (see its header for the
+# full rationale); only the flight tune differs. The raw 4.5.0 "dump all"
+# cannot be fed to the master converter directly: it rejects the renamed 4.5
+# settings (serialrx_provider, dshot_*, min_throttle, beeper_*, d_min_*, ...)
+# and would still apply motor_pwm_protocol DSHOT300, which trips the
+# MOTOR_PROTO arming block. So we start from `defaults nosave` and re-apply
+# only the master-valid, flight-relevant deltas.
+#
+# Translations / drops vs the vendor wisp dump:
+#   d_min_roll 30 / d_min_pitch 34   -> d_roll 30 / d_pitch 34  (4.6 D/Dmax
+#       rework renamed d_min -> d; the old static D 40/46 -> d_max_roll/pitch)
+#   dshot_idle_value 550             -> motor_idle 550 (master unified idle)
+#   motor_pwm_protocol DSHOT300      -> dropped (SITL has no DSHOT transport;
+#       trips MOTOR_PROTO; idle floor carried by motor_idle)
+#   dshot_bidir / dshot_bitbang      -> dropped (no DSHOT telemetry in sim;
+#       same KNOWN GAP as air75_sim.txt: real quad's RPM filter is absent)
+#   feature RX_SERIAL / serialrx CRSF-> dropped (no serial RX in sim -> RXLOSS)
+#   feature TELEMETRY / vtx / gps    -> dropped (no such hardware in SITL)
+#   acc_calibration                  -> dropped (sim accel is already perfect)
+#   aux 0 ARM remapped onto AUX1 hi  -> matches the harness RC injection so the
+#       arm switch actually clears (vendor mapped ARM to AUX3, which the sim
+#       harness never drives -> ARM_SWITCH lockout)
+#
+# The wisp profile-0 PIDs are stock Betaflight 4.5 defaults; the only real
+# deltas from a default tune are the dynamic-notch config and the rates.
+# OSD block is kept (made visible in profile 1 so the sim grid renders).
+
+defaults nosave
+
+board_name BETAFPVG473
+manufacturer_id BEFH
+
+# name: AIR75
+
+# feature
+feature OSD
+
+# aux
+aux 0 0 0 1700 2100 0 0
+aux 1 1 1 900 1300 0 0
+aux 2 2 1 1300 1700 0 0
+aux 3 13 3 1700 2100 0 0
+aux 4 35 2 1700 2100 0 0
+
+# master
+set gyro_lpf1_static_hz = 0
+set gyro_lpf2_static_hz = 500
+set dyn_notch_count = 2
+set dyn_notch_q = 400
+set dyn_notch_min_hz = 100
+set dyn_notch_max_hz = 500
+set gyro_lpf1_dyn_min_hz = 0
+set acc_lpf_hz = 1
+set baro_hardware = NONE
+set motor_idle = 550
+set motor_poles = 12
+set vbat_max_cell_voltage = 440
+set vbat_warning_cell_voltage = 345
+set ibata_offset = -600
+set yaw_motors_reversed = ON
+set small_angle = 180
+set pid_process_denom = 2
+set osd_vbat_pos = 2369
+set osd_rssi_pos = 226
+set osd_link_quality_pos = 2337
+set osd_tim_1_pos = 386
+set osd_tim_2_pos = 2454
+set osd_remaining_time_estimate_pos = 33
+set osd_flymode_pos = 2422
+set osd_throttle_pos = 2390
+set osd_crosshairs_pos = 2253
+set osd_current_pos = 2400
+set osd_mah_drawn_pos = 2434
+set osd_craft_name_pos = 2443
+set osd_home_dist_pos = 98
+set osd_flight_dist_pos = 130
+set osd_warnings_pos = 2378
+set osd_avg_cell_voltage_pos = 44
+set osd_pit_ang_pos = 97
+set osd_rol_ang_pos = 65
+set osd_disarmed_pos = 267
+set osd_core_temp_pos = 278
+set osd_displayport_device = AUTO
+set craft_name = AIR75
+
+profile 0
+
+# profile 0
+set profile_name = wisp
+set p_pitch = 47
+set i_pitch = 84
+set d_pitch = 34
+set d_max_pitch = 46
+set f_pitch = 125
+set p_roll = 45
+set i_roll = 80
+set d_roll = 30
+set d_max_roll = 40
+set f_roll = 120
+set p_yaw = 45
+set i_yaw = 80
+set d_yaw = 0
+set f_yaw = 120
+
+profile 1
+
+profile 2
+
+profile 3
+
+# restore original profile selection
+profile 0
+
+rateprofile 0
+
+# rateprofile 0
+set roll_rc_rate = 80
+set pitch_rc_rate = 80
+set yaw_rc_rate = 70
+set roll_srate = 80
+set pitch_srate = 80
+set yaw_srate = 70
+
+rateprofile 1
+
+rateprofile 2
+
+rateprofile 3
+
+# restore original rateprofile selection
+rateprofile 0
+
+save

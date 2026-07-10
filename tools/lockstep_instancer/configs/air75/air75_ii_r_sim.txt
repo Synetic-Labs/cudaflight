@@ -1,0 +1,209 @@
+# BetaFPV "Air75 II R" (Racing) — sim-adapted CLI dump.
+#
+# Source: A75 II R_0802_Racing_GF 1614_2026_6_0 20260421.txt
+#   (Betaflight 2026.6.0-alpha / STM32G47X / BETAFPVG473_V2, MSP API 1.48).
+# Convert to a boot-ready EEPROM image with:
+#
+#   obj/multi/betaflight_SITL_LOCKSTEP_MULTI \
+#       --cli-dump tools/lockstep_instancer/configs/air75/air75_ii_r_sim.txt \
+#       --eeprom obj/configs/air75_ii_r_acro.eeprom
+#
+# This dump is the SAME firmware version as the SITL master build, so (unlike
+# the 4.5.0 air75_sim.txt / air75_wisp_sim.txt, which re-derive deltas from
+# `defaults nosave` to bridge a rename gap) no translation is needed. The full
+# pilot tune is kept verbatim; only lines the SITL build cannot honour are
+# commented out below with a [sim] tag:
+#   set motor_pwm_protocol DSHOT300  -> trips MOTOR_PROTO arming block (no
+#       DSHOT transport in SITL); protocol falls back to the compiled default.
+#   set dshot_bidir / dshot_bitbang  -> no DSHOT telemetry in sim (KNOWN GAP:
+#       the real quad's RPM filter is absent).
+#   vtx_* / vcd_video_system / system_hse_mhz / osd_rssi_dbm_pos -> INVALID
+#       NAME in the SITL build (VTX, analog video, HSE clock, rssi-dBm OSD
+#       element are not compiled in).
+#
+# ACRO ONLY: the vendor dump maps ANGLE (aux 1) and HORIZON (aux 2) onto AUX2.
+# The sim harness does not drive AUX2, so a stabilized mode could latch on at
+# the channel's rest value. Both ranges are emptied (start==end) below so
+# neither can ever activate -> pure acro regardless of harness RC injection.
+#
+
+
+# diff all
+
+# version
+# Betaflight / STM32G47X (G473) 2026.6.0-alpha Apr 15 2026 / 16:24:57 (norevision) MSP API: 1.48
+
+# start the command batch
+batch start
+
+# reset configuration to default settings
+defaults nosave
+
+board_name BETAFPVG473_V2
+manufacturer_id BEFH
+mcu_id 001800133235511830303938
+signature 
+
+# name: AIR75 R
+
+# feature
+feature OSD
+
+# beacon
+beacon RX_LOST
+beacon RX_SET
+
+# aux
+aux 0 0 0 1700 2100 0 0
+# [sim] acro: aux 1 1 1 900 1300 0 0
+aux 1 1 1 900 900 0 0
+# [sim] acro: aux 2 2 1 1300 1700 0 0
+aux 2 2 1 1300 1300 0 0
+aux 3 13 3 1700 2100 0 0
+aux 4 35 2 1700 2100 0 0
+
+# vtxtable
+vtxtable bands 6
+vtxtable channels 8
+vtxtable band 1 BOSCAM_A A FACTORY 5865 5845 5825 5805 5785 5765 5745 5725
+vtxtable band 2 BOSCAM_B B FACTORY 5733 5752 5771 5790 5809 5828 5847 5866
+vtxtable band 3 BOSCAM_E E FACTORY 5705 5685 5665 5645 5885 5905 5925 5945
+vtxtable band 4 FATSHARK F FACTORY 5740 5760 5780 5800 5820 5840 5860 5880
+vtxtable band 5 RACEBAND R FACTORY 5658 5695 5732 5769 5806 5843 5880 5917
+vtxtable band 6 LOWRACE  L FACTORY 5362 5399 5436 5473 5510 5547 5584 5621
+vtxtable powerlevels 5
+vtxtable powervalues 1 2 3 4 0
+vtxtable powerlabels 25 100 200 400 PIT
+
+# master
+set gyro_lpf1_static_hz = 0
+set gyro_lpf2_static_hz = 550
+set gyro_notch1_hz = 155
+set gyro_notch1_cutoff = 130
+set dyn_notch_count = 1
+set dyn_notch_q = 500
+set dyn_notch_max_hz = 500
+set gyro_lpf1_dyn_min_hz = 0
+set gyro_lpf1_dyn_max_hz = 550
+set acc_calibration = 8,15,-70,1
+# [sim] set dshot_bidir = ON
+# [sim] set dshot_bitbang = AUTO
+# [sim] set motor_pwm_protocol = DSHOT300
+set motor_poles = 12
+set align_board_yaw = -45
+set vbat_scale = 113
+set ibata_offset = -600
+set yaw_motors_reversed = ON
+set small_angle = 180
+set pid_process_denom = 2
+set simplified_gyro_filter_multiplier = 110
+set osd_rssi_alarm = 0
+set osd_rssi_dbm_alarm = -99
+set osd_cap_alarm = 0
+set osd_alt_alarm = 0
+set osd_vbat_pos = 2401
+set osd_rssi_pos = 226
+set osd_link_quality_pos = 2369
+# [sim] set osd_rssi_dbm_pos = 2337
+set osd_tim_1_pos = 386
+set osd_tim_2_pos = 2454
+set osd_remaining_time_estimate_pos = 33
+set osd_flymode_pos = 2422
+set osd_throttle_pos = 2390
+set osd_vtx_channel_pos = 2081
+set osd_crosshairs_pos = 2253
+set osd_current_pos = 2432
+set osd_mah_drawn_pos = 386
+set osd_craft_name_pos = 2443
+set osd_home_dist_pos = 98
+set osd_flight_dist_pos = 130
+set osd_warnings_pos = 2378
+set osd_avg_cell_voltage_pos = 44
+set osd_pit_ang_pos = 97
+set osd_rol_ang_pos = 65
+set osd_disarmed_pos = 267
+set osd_esc_tmp_pos = 163
+set osd_esc_rpm_pos = 150
+set osd_core_temp_pos = 278
+set osd_displayport_device = MAX7456
+# [sim] set system_hse_mhz = 0
+# [sim] set vtx_band = 5
+# [sim] set vtx_channel = 3
+# [sim] set vtx_power = 1
+# [sim] set vtx_freq = 5732
+# [sim] set vcd_video_system = NTSC
+set craft_name = AIR75 R
+
+profile 0
+
+# profile 0
+set profile_name = GF 1614
+set anti_gravity_gain = 70
+set throttle_boost = 0
+set p_pitch = 39
+set i_pitch = 85
+set d_pitch = 28
+set f_pitch = 58
+set p_roll = 38
+set i_roll = 81
+set d_roll = 25
+set f_roll = 56
+set p_yaw = 38
+set i_yaw = 81
+set f_yaw = 56
+set d_max_roll = 28
+set d_max_pitch = 32
+set d_max_gain = 20
+set auto_profile_cell_count = 1
+set feedforward_jitter_factor = 5
+set simplified_master_multiplier = 85
+set simplified_i_gain = 120
+set simplified_d_max_gain = 40
+set simplified_feedforward_gain = 55
+set tpa_rate = 60
+set tpa_breakpoint = 1180
+
+profile 1
+
+profile 2
+
+profile 3
+
+# restore original profile selection
+profile 0
+
+rateprofile 0
+
+# rateprofile 0
+set thr_mid = 28
+set thr_expo = 25
+set thr_hover = 17
+set roll_srate = 58
+set pitch_srate = 58
+set yaw_srate = 50
+
+rateprofile 1
+
+rateprofile 2
+
+rateprofile 3
+
+battery_profile 0
+
+# battery_profile 0
+set vbat_max_cell_voltage = 440
+set vbat_warning_cell_voltage = 345
+
+battery_profile 1
+
+battery_profile 2
+
+# restore original rateprofile selection
+rateprofile 0
+
+# restore original battery_profile selection
+battery_profile 0
+
+# save configuration
+save
+# 
