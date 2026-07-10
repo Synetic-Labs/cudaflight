@@ -130,7 +130,15 @@ KERNEL void bfFwStepGrad(const float *actions, const float *seedMotors,
 // tape via device malloc (hundreds of small allocs per thread), which exhausts
 // the device malloc heap once fleet x horizon is large (a null malloc -> illegal
 // address; see cudaflight.cpp). Forward mode has no tape, so it scales to any fleet.
-KERNEL void bfFwStepJacGradPure(const float *actions, float *jacOut, char *scratch)
+// ncols selects how many leading action columns to fill: ncols==4 is the full
+// Jacobian (the standalone "enzyme" backend); ncols==3 computes only the smooth
+// attitude columns (roll/pitch/yaw) and SKIPS the throttle column — the hybrid
+// backend takes throttle from a finite-difference column instead (forward-mode
+// Enzyme through the int16 throttle lookup yields ~0 there anyway), so skipping
+// it saves one of the four forward sweeps at no accuracy cost. Untouched columns
+// are left zero.
+KERNEL void bfFwStepJacGradPure(const float *actions, float *jacOut, char *scratch,
+                                int ncols)
 {
     const unsigned k = self();
     if (k >= __bf_inst_count) {
@@ -149,8 +157,11 @@ KERNEL void bfFwStepJacGradPure(const float *actions, float *jacOut, char *scrat
 
     const float *a = &actions[(uint64_t)k * 4];
     float *J = &jacOut[(uint64_t)k * 16];
+    for (int i = 0; i < 16; i++) {
+        J[i] = 0.0f;   // zero untouched columns when ncols < 4
+    }
 
-    for (int d = 0; d < 4; d++) {
+    for (int d = 0; d < ncols; d++) {
         float motors[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         float dmotors[4] = { 0.0f, 0.0f, 0.0f, 0.0f };   // forward sweep result
         float da[4] = { 0.0f, 0.0f, 0.0f, 0.0f };

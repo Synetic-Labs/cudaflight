@@ -457,10 +457,23 @@ KERNEL void bfRateEval(const float *actions, float *motorsOut)
 // after every perturbed eval, so each difference starts from the same state.
 // Shared by the three FD kernels below so the perturbation math lives in one place.
 static inline void bfRateJacobianFD(char *blob, char *sc, const float *a,
-                                    float eps, float jac[4][4])
+                                    float eps, float jac[4][4], int onlyCol)
 {
+    // onlyCol < 0 -> full 4x4 Jacobian (all action columns). onlyCol in [0,3] ->
+    // only that action column is finite-differenced (the rest are left zero). The
+    // hybrid backend needs only the throttle column from FD (the smooth attitude
+    // columns come from exact forward-mode Enzyme), so a single column saves 3 of
+    // the 4 central-difference sweeps — each sweep being two full control-law
+    // evaluations plus a blob save/restore.
+    for (int i = 0; i < 4; i++) {
+        for (int d = 0; d < 4; d++) {
+            jac[i][d] = 0.0f;
+        }
+    }
     memcpy(sc, blob, __bf_image_size);   // freeze the current instance state
-    for (int d = 0; d < 4; d++) {
+    const int d0 = (onlyCol < 0) ? 0 : onlyCol;
+    const int d1 = (onlyCol < 0) ? 4 : onlyCol + 1;
+    for (int d = d0; d < d1; d++) {
         float rc[4], mp[4], mm[4];
         // +eps
         for (int i = 0; i < 4; i++) {
@@ -496,7 +509,7 @@ KERNEL void bfFwStepGradFD(const float *actions, const float *seedMotors,
     const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
 
     float jac[4][4];                      // jac[i][d] = d(motor_i)/d(action_d)
-    bfRateJacobianFD(blob, sc, a, eps, jac);
+    bfRateJacobianFD(blob, sc, a, eps, jac, -1);
 
     const float *seed = &seedMotors[(uint64_t)k * 4];
     for (int d = 0; d < 4; d++) {
@@ -524,7 +537,7 @@ KERNEL void bfFwStepJacFD(const float *actions, float *jacOut, char *scratch, fl
     const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
 
     float jac[4][4];
-    bfRateJacobianFD(blob, sc, a, eps, jac);
+    bfRateJacobianFD(blob, sc, a, eps, jac, -1);
 
     float *J = &jacOut[(uint64_t)k * 16];
     for (int i = 0; i < 4; i++) {
@@ -543,7 +556,8 @@ KERNEL void bfFwStepJacFD(const float *actions, float *jacOut, char *scratch, fl
 // that follows in the same custom_vjp forward rebases at most once more (idempotent).
 // A bfSetBase launch must point __bf_inst_base at this blob ahead of the call
 // (the FFI handler does that, stream-ordered).
-KERNEL void bfFwStepJacFDPure(const float *actions, float *jacOut, char *scratch, float eps)
+KERNEL void bfFwStepJacFDPure(const float *actions, float *jacOut, char *scratch,
+                              float eps, int col)
 {
     const unsigned k = self();
     if (k >= __bf_inst_count) {
@@ -554,8 +568,10 @@ KERNEL void bfFwStepJacFDPure(const float *actions, float *jacOut, char *scratch
     char *sc = scratch + (uint64_t)k * __bf_inst_stride;
     const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
 
+    // col < 0 -> full Jacobian; col in [0,3] -> only that action column (the
+    // hybrid backend passes col=3 for the throttle column only).
     float jac[4][4];
-    bfRateJacobianFD(blob, sc, a, eps, jac);
+    bfRateJacobianFD(blob, sc, a, eps, jac, col);
 
     float *J = &jacOut[(uint64_t)k * 16];
     for (int i = 0; i < 4; i++) {
