@@ -22,8 +22,9 @@ dependencies = []  # core loader is stdlib-only (ctypes + importlib.resources)
 
 [project.optional-dependencies]
 torch = ["torch", "numpy"]
-jax = ["jax"]
-viz = ["torch", "numpy", "pygame"]
+# CPU-only jax cannot back the env (it needs jax.devices("gpu"))
+jax = ["jax[cuda12]"]
+viz = ["torch", "numpy", "pygame", "pillow"]
 
 [project.scripts]
 wall-of-betaflight = "cudaflight.wall_of_betaflight:main"

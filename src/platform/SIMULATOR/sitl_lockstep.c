@@ -205,7 +205,8 @@ void systemInit(void)
 {
     printf("[SITL_LOCKSTEP] System init, deterministic virtual clock\n");
 
-    SystemCoreClock = 500 * 1e6; // virtual 500MHz
+    // arbitrary: the clockCycles<->micros conversions above are identity
+    SystemCoreClock = 500 * 1e6;
 }
 
 void systemReset(void)
@@ -271,46 +272,19 @@ void bflSetBaro(int32_t pressurePa)
     virtualBaroSet(pressurePa, 2500);
 }
 
-void bflSetAttitudeQuat(float w, float x, float y, float z)
-{
-#if !defined(USE_IMU_CALC)
-    imuSetAttitudeQuat(w, x, y, z);
-#else
-    UNUSED(w); UNUSED(x); UNUSED(y); UNUSED(z);
-#endif
-}
-
 void bflSetRc(const uint16_t *channels, uint8_t channelCount)
 {
     rxUpdateUdpChannels(channels, channelCount);
 }
 
-// Differentiable RC path: write float channel values [1000;2000] straight
-// into rcData, bypassing the uint16 UDP-channel quantization that makes the
-// normal bflSetRc() path non-differentiable w.r.t. a continuous action. No
-// new-frame flag is raised, so the rx task does not overwrite rcData from the
-// (stale) UDP buffer within the step — the injected setpoint persists into
-// processRcCommand(). Used by the autodiff core; the forward/eval path still
-// uses bflSetRc().
-void bflSetRcFloat(const float *channels, uint8_t channelCount)
-{
-    const uint8_t count = channelCount < MAX_SUPPORTED_RC_CHANNEL_COUNT
-                              ? channelCount : MAX_SUPPORTED_RC_CHANNEL_COUNT;
-    for (uint8_t i = 0; i < count; i++) {
-        rcData[i] = channels[i];
-    }
-}
-
-// Differentiable rate-control core for the autodiff path. Runs the REAL
-// Betaflight stick->motor pipeline directly on the active instance — no
-// scheduler, no logging/telemetry/IO tasks — so Enzyme only ever sees the
-// control math: rcData -> (expo) rcCommand -> (rates) setpoint -> pidController
-// -> mixTable -> motor[]. The inputs (rcData) and outputs (motor[]) are plain
-// float arrays Enzyme can shadow; the stateful config/runtime globals
-// (currentPidProfile, currentControlRateProfile, pidRuntime, mixerRuntime,
-// gyro) are frozen via enzyme_inactive markers on the autodiff side, yielding
-// the within-step d(motor)/d(stick) sensitivity. rcChannelsUs: 4 RC channels
-// in [1000,2000] us, AETR order (roll, pitch, throttle, yaw).
+// Rate-control core for the gradient kernels. Runs the REAL Betaflight
+// stick->motor pipeline directly on the active instance — no scheduler, no
+// logging/telemetry/IO tasks — just the control math: rcData -> (expo)
+// rcCommand -> (rates) setpoint -> pidController -> mixTable -> motor[].
+// Writing rcData as floats bypasses the uint16 UDP-channel quantization of
+// the normal bflSetRc() path, so the finite-difference gradient sees a
+// smooth stick->motor map. rcChannelsUs: 4 RC channels in [1000,2000] us,
+// AETR order (roll, pitch, throttle, yaw).
 void bflRateCore(const float *rcChannelsUs)
 {
     for (int i = 0; i < 4; i++) {
@@ -328,12 +302,11 @@ void bflRateCore(const float *rcChannelsUs)
 // PWM motors / servos
 // ===========================================================================
 
-static pwmOutputPort_t servos[MAX_SUPPORTED_SERVOS];
-
 static int16_t motorsPwm[MAX_SUPPORTED_MOTORS];
-static int16_t servosPwm[MAX_SUPPORTED_SERVOS];
 static int16_t idlePulse;
 
+// motorsPwmRaw holds motors followed by servos (servoWrite appends at
+// pwmMotorCount), all readable through bflGetMotorsPwm.
 static float motorsPwmRaw[BFL_MAX_PWM_CHANNELS];
 static float motorsNormalised[MAX_SUPPORTED_MOTORS];
 static uint64_t motorUpdateCount = 0;
@@ -341,9 +314,6 @@ static uint64_t motorUpdateCount = 0;
 void servoDevInit(const servoDevConfig_t *servoConfig)
 {
     UNUSED(servoConfig);
-    for (uint8_t servoIndex = 0; servoIndex < MAX_SUPPORTED_SERVOS; servoIndex++) {
-        servos[servoIndex].enabled = true;
-    }
 }
 
 pwmOutputPort_t *pwmGetMotors(void)
@@ -404,7 +374,6 @@ static void pwmCompleteMotorUpdate(void)
 
 void servoWrite(uint8_t index, float value)
 {
-    servosPwm[index] = value;
     if (index + pwmMotorCount < BFL_MAX_PWM_CHANNELS) {
         motorsPwmRaw[index + pwmMotorCount] = value;
     }
@@ -447,20 +416,20 @@ bool motorPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig,
     return true;
 }
 
-// Armed state accessor for the harness. The harness is native (never IR
-// instanced) so it must not read firmware globals like armingFlags
-// directly: in a multi-instance build that would hit the pristine
-// template image instead of the active instance. This function is
-// firmware-side, so its access is rewritten with the rest.
+// ===========================================================================
+// Harness accessors. The harness is native (never IR-instanced), so it must
+// not touch firmware globals or static-inline PG accessors directly: in a
+// multi-instance build those hit the pristine template image instead of the
+// active instance. Everything below is compiled firmware-side, so its
+// accesses are rewritten with the rest of the firmware.
+// ===========================================================================
+
 bool bflIsArmed(void)
 {
     return ARMING_FLAG(ARMED);
 }
 
 // Map ARM to AUX1 high (equivalent of CLI: aux 0 0 0 1700 2100 0 0).
-// Must live firmware-side: modeActivationConditionsMutable() is a
-// static-inline PG accessor, and inlined into the native harness it
-// would write the template image instead of the active instance.
 void bflConfigureArmSwitch(void)
 {
     modeActivationConditionsMutable(0)->modeId = BOXARM;
@@ -472,7 +441,6 @@ void bflConfigureArmSwitch(void)
 
 // Map ANGLE (self-levelling) to AUX2 high (equivalent of CLI:
 // aux 1 1 1 1700 2100 0 0). AUX2 low => acro (rate) mode, the FPV default.
-// Firmware-side for the same reason as bflConfigureArmSwitch.
 void bflConfigureModeSwitch(void)
 {
     modeActivationConditionsMutable(1)->modeId = BOXANGLE;
@@ -512,7 +480,7 @@ void bflGetMotorsNormalised(float *out, unsigned maxCount)
 }
 
 // Raw float mixer output (motor[]), BEFORE the int16 motorsPwm quantization
-// that bflGetMotorsNormalised goes through. The smooth signal the autodiff /
+// that bflGetMotorsNormalised goes through. The smooth signal the
 // finite-difference gradient must read so small perturbations aren't lost to
 // integer truncation.
 void bflGetMotorsRaw(float *out, unsigned maxCount)
@@ -531,8 +499,7 @@ uint64_t bflGetMotorUpdateCount(void)
 // yaw_motors_reversed the firmware negates its yaw mixer column because
 // the props physically spin opposite to the default direction — the
 // physics model must flip its reaction torque signs to match the real
-// airframe. Firmware-side so the PG accessor is not inlined into the
-// native harness.
+// airframe.
 bool bflYawMotorsReversed(void)
 {
     return mixerConfig()->yaw_motors_reversed;
@@ -542,9 +509,9 @@ bool bflYawMotorsReversed(void)
 // CLI text execution. Feeds a block of CLI commands (e.g. a manufacturer
 // CLI dump) through the real CLI parser against the active instance, so
 // loading a config exercises the exact code path a configurator paste
-// does. The caller must sanitise reboot-class commands first ('save',
-// 'exit', 'defaults' without nosave, 'bl', 'msc'): on this target
-// systemReset() exits the process. See bflLoadCliDump() in the harness.
+// does. The caller must sanitise reboot-class commands first (see
+// sanitizeCliDump() in sitl_lockstep_main.c and the ban list in
+// sitl_lockstep.h): systemReset() exits the process on this target.
 // ===========================================================================
 
 static const char *cliFeedBuf;      // text being fed (caller-owned)
@@ -673,10 +640,9 @@ char _estack;
 char _Min_Stack_Size;
 
 // ===========================================================================
-// Virtual EEPROM. File backed by default (path overridable for parallel
-// instances); BFL_EEPROM_RAM (the GPU build) drops all file I/O and works
-// purely on eepromData, which is firmware state and therefore per-instance.
-// A NULL path selects the same RAM-only behaviour at runtime.
+// Virtual EEPROM. File backed by default; BFL_EEPROM_RAM (the GPU build)
+// or a NULL path work purely on eepromData (see bflSetEepromPath in the
+// header).
 // ===========================================================================
 
 #ifdef BFL_EEPROM_RAM
@@ -716,18 +682,18 @@ bool loadEEPROMFromFile(void)
     if (eepromFd != NULL) {
         // obtain file size:
         fseek(eepromFd, 0, SEEK_END);
-        size_t lSize = ftell(eepromFd);
+        const long fileSize = ftell(eepromFd);
         rewind(eepromFd);
 
         size_t n = fread(eepromData, 1, sizeof(eepromData), eepromFd);
-        if (n == lSize) {
-            printf("[FLASH_Unlock] loaded '%s', size = %ld / %ld\n", eepromPath, lSize, sizeof(eepromData));
+        if (fileSize >= 0 && n == (size_t)fileSize) {
+            printf("[FLASH_Unlock] loaded '%s', size = %zu / %zu\n", eepromPath, n, sizeof(eepromData));
         } else {
             fprintf(stderr, "[FLASH_Unlock] failed to load '%s'\n", eepromPath);
             return false;
         }
     } else {
-        printf("[FLASH_Unlock] created '%s', size = %ld\n", eepromPath, sizeof(eepromData));
+        printf("[FLASH_Unlock] created '%s', size = %zu\n", eepromPath, sizeof(eepromData));
         if ((eepromFd = fopen(eepromPath, "w+")) == NULL) {
             fprintf(stderr, "[FLASH_Unlock] failed to create '%s'\n", eepromPath);
             return false;

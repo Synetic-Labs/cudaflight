@@ -15,6 +15,8 @@ from pathlib import Path
 
 
 def _resource(name: str) -> Path:
+    # assumes the wheel is installed unzipped (no zipimport): the path must
+    # stay valid after the as_file() context exits
     ref = files("cudaflight._data") / name
     with as_file(ref) as p:
         return Path(p)
@@ -37,7 +39,7 @@ def default_fatbin_path() -> Path:
     return p
 
 
-def load(lib_path=None) -> ctypes.CDLL:
+def load(lib_path: "str | os.PathLike[str] | None" = None) -> ctypes.CDLL:
     path = Path(lib_path) if lib_path else default_lib_path()
     if not path.exists():
         raise FileNotFoundError(
@@ -52,15 +54,15 @@ def load(lib_path=None) -> ctypes.CDLL:
     # (None boots defaults); see tools/lockstep_instancer/configs/
     lib.cudaflight_create_eeprom.restype = ctypes.c_void_p
     lib.cudaflight_create_eeprom.argtypes = [ctypes.c_char_p, ctypes.c_uint32, ctypes.c_int,
-                                        ctypes.c_uint32, ctypes.c_char_p]
-    # with_grad variant: when 0, skips the differentiable-rollout scratch
-    # (gradScratch = stride*n, as large as the whole instance array) so a PPO-only
-    # fleet fits ~1.5x more worlds. Guarded for older libcudaflight.so without it.
+                                             ctypes.c_uint32, ctypes.c_char_p]
+    # with_grad variant: when 0, skips the FD-Jacobian scratch (gradScratch =
+    # stride*n, as large as the whole instance array) so a PPO-only fleet fits
+    # ~1.5x more worlds. Guarded for older libcudaflight.so without it.
     if hasattr(lib, "cudaflight_create_eeprom_ex"):
         lib.cudaflight_create_eeprom_ex.restype = ctypes.c_void_p
         lib.cudaflight_create_eeprom_ex.argtypes = [ctypes.c_char_p, ctypes.c_uint32,
-                                               ctypes.c_int, ctypes.c_uint32,
-                                               ctypes.c_char_p, ctypes.c_int]
+                                                    ctypes.c_int, ctypes.c_uint32,
+                                                    ctypes.c_char_p, ctypes.c_int]
     for name in ("cudaflight_num_envs", "cudaflight_act_dim", "cudaflight_obs_dim"):
         getattr(lib, name).restype = ctypes.c_uint32
         getattr(lib, name).argtypes = [ctypes.c_void_p]
@@ -100,15 +102,13 @@ def load(lib_path=None) -> ctypes.CDLL:
         getattr(lib, name).restype = ctypes.c_uint64
         getattr(lib, name).argtypes = [ctypes.c_void_p]
     lib.cudaflight_osd_update.argtypes = [ctypes.c_void_p]
-    # raw launch parameters for the XLA FFI fused path (sim.fused in
-    # betaflight-gym): kernel function pointers, the shared CUDA context,
-    # and the per-instance state/snapshot buffers, all consumed by the
-    # in-jit custom calls.
+    # raw launch parameters for an out-of-tree XLA FFI fused path: kernel
+    # function pointers, the shared CUDA context, and the per-instance
+    # state/snapshot buffers, all consumed by in-jit custom calls.
     for name in ("cudaflight_fw_step_kernel", "cudaflight_state_ptr", "cudaflight_ctx",
                  "cudaflight_reset_kernel", "cudaflight_snap_state_ptr", "cudaflight_snap_ptr",
                  "cudaflight_jac_fd_kernel", "cudaflight_grad_scratch_ptr",
-                 "cudaflight_grad_kernel",
-                 "cudaflight_jac_fd_pure_kernel", "cudaflight_jac_grad_pure_kernel",
+                 "cudaflight_jac_fd_pure_kernel",
                  "cudaflight_set_base_kernel", "cudaflight_stride", "cudaflight_state_size",
                  "cudaflight_inst_ptr"):
         getattr(lib, name).restype = ctypes.c_uint64
@@ -124,13 +124,12 @@ def default_cpu_lib_path() -> Path:
     return Path(env) if env else _resource("libcpuflight.so")
 
 
-def load_cpu(lib_path=None) -> ctypes.CDLL:
+def load_cpu(lib_path: "str | os.PathLike[str] | None" = None) -> ctypes.CDLL:
     """ctypes binding for libcpuflight.so — the CPU SITL twin of the
     external-physics API (cpuflight.c). No CUDA and no minimum fleet size
     (cudaflight refuses n < 3: the runtime relocation table cannot be
-    discovered below 3 instances). Instances step sequentially in-process,
-    so this is the right backend for small interactive fleets, not
-    training-scale ones. Overridable via CPUFLIGHT_LIB."""
+    discovered below 3 instances). Instances step sequentially in-process.
+    Overridable via CPUFLIGHT_LIB."""
     path = Path(lib_path) if lib_path else default_cpu_lib_path()
     if not path.exists():
         raise FileNotFoundError(
@@ -162,6 +161,7 @@ def load_cpu(lib_path=None) -> ctypes.CDLL:
     lib.cpuflight_snapshot.argtypes = [ctypes.c_void_p]
     lib.cpuflight_reset_mask.restype = ctypes.c_int
     lib.cpuflight_reset_mask.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8)]
+    lib.cpuflight_reset_all.restype = ctypes.c_int
     lib.cpuflight_reset_all.argtypes = [ctypes.c_void_p]
     lib.cpuflight_destroy.argtypes = [ctypes.c_void_p]
     return lib

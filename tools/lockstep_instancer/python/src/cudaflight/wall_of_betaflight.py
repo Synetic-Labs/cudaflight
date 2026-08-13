@@ -18,10 +18,9 @@ per-instance stick wiggles, so every tile tilts differently. Keys:
   b          toggle blink rendering
   ESC/q      quit
 
-Run (from tools/lockstep_instancer/python, inside .venv):
-  python wall_of_betaflight.py 256 --show 6x3
-  python wall_of_betaflight.py 64 --headless --frames 120 --screenshot wall.png
-  python wall_of_betaflight.py 256 --viz3d   # + crazyflow MuJoCo window
+Run (installed with the [viz] extra):
+  wall-of-betaflight 256 --show 6x3
+  wall-of-betaflight 64 --headless --frames 120 --screenshot wall.png
 """
 
 import argparse
@@ -30,21 +29,21 @@ import os
 import sys
 import time
 
-import numpy as np
 import torch
 
 from .torch_env import BetaflightEnv
 from .osd_wall import OsdWall
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Wall of Betaflights")
     p.add_argument("envs", nargs="?", type=int, default=64,
                    help="firmware instances on the GPU (default 64)")
     p.add_argument("--show", default="5x3",
                    help="tiles shown as CxR (default 5x3)")
     p.add_argument("--scale", type=float, default=1.0, help="tile scale")
-    p.add_argument("--fps", type=int, default=30)
+    p.add_argument("--fps", type=int, default=30,
+                   help="render rate; also sets the control decimation")
     p.add_argument("--eeprom", default=None,
                    help="boot-ready EEPROM image (e.g. from --cli-dump): the"
                         " wall then shows that quad's own OSD layout")
@@ -59,7 +58,7 @@ def parse_args():
     return p.parse_args()
 
 
-def main():
+def main() -> int:
     args = parse_args()
     tx, ty = (int(v) for v in args.show.lower().split("x"))
     show = tx * ty
@@ -90,11 +89,12 @@ def main():
 
     viewer = None
     if args.viz3d:
-        from betaflight_gym.viz import FleetViewer
+        try:
+            from betaflight_gym.viz import FleetViewer
+        except ImportError:
+            sys.exit("--viz3d needs the separate betaflight-gym package")
         viewer = FleetViewer(num_drones=show)
 
-    # hover controller state: per-instance altitude targets and wiggle
-    # phases so no two tiles fly identically
     k = torch.arange(n, device=env.device, dtype=torch.float32)
     target_alt = 4.0 + 2.0 * (k % 5) / 4.0
     phase = 2.0 * math.pi * k / max(n, 1)

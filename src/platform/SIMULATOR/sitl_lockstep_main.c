@@ -67,7 +67,7 @@ typedef struct {
 
 static instance_t *insts;
 static unsigned numInstances = 1;
-static uint64_t samples = 0;
+static uint64_t controlSteps = 0;
 
 static uint64_t fnv1a64(uint64_t hash, const void *data, size_t len)
 {
@@ -101,8 +101,13 @@ static bool lineFirstTokenIs(const char *line, const char *token)
 
 static char *sanitizeCliDump(const char *text, size_t len, size_t *outLen)
 {
-    // worst case: every line is "defaults" gaining " nosave"
-    char *out = malloc(len + len / 2 + 64);
+    // worst case: every line is "defaults\n" (9 bytes) rewritten to
+    // "defaults nosave\n" (16), i.e. < 2x, plus the trailing save
+    char *out = malloc(len * 2 + 64);
+    if (!out) {
+        fprintf(stderr, "[harness] out of memory sanitising CLI dump\n");
+        exit(1);
+    }
     size_t o = 0;
 
     const char *p = text;
@@ -111,7 +116,13 @@ static char *sanitizeCliDump(const char *text, size_t len, size_t *outLen)
         const char *nl = memchr(p, '\n', end - p);
         const size_t lineLen = nl ? (size_t)(nl - p) + 1 : (size_t)(end - p);
         char line[512];
-        const size_t n = lineLen < sizeof(line) - 1 ? lineLen : sizeof(line) - 1;
+        if (lineLen > sizeof(line) - 1) {
+            fprintf(stderr, "[harness] CLI dump line longer than %zu bytes dropped\n",
+                    sizeof(line) - 1);
+            p += lineLen;
+            continue;
+        }
+        const size_t n = lineLen;
         memcpy(line, p, n);
         line[n] = '\0';
         p += lineLen;
@@ -148,9 +159,16 @@ static int runCliDumpConverter(const char *dumpPath)
     fseek(f, 0, SEEK_END);
     const long size = ftell(f);
     rewind(f);
+    if (size < 0) {
+        fprintf(stderr, "[harness] cannot size '%s'\n", dumpPath);
+        fclose(f);
+        return 1;
+    }
     char *text = malloc(size + 1);
-    if (fread(text, 1, size, f) != (size_t)size) {
+    if (!text || fread(text, 1, size, f) != (size_t)size) {
         fprintf(stderr, "[harness] failed to read '%s'\n", dumpPath);
+        free(text);
+        fclose(f);
         return 1;
     }
     fclose(f);
@@ -164,8 +182,7 @@ static int runCliDumpConverter(const char *dumpPath)
     bflCliExec(cli, (uint32_t)cliLen);
     free(cli);
 
-    // show what the firmware actually accepted — this output is the
-    // verification artifact, compare it against the source dump
+    // the accepted configuration is the verification artifact
     printf("[harness] resulting configuration (diff all):\n");
     const char diffCmd[] = "diff all\n";
     bflCliExec(diffCmd, sizeof(diffCmd) - 1);
@@ -200,14 +217,17 @@ static void controlStep(unsigned k)
 static void dumpOsd(unsigned k, const char *when)
 {
     activate(k);
-    const unsigned rows = bflOsdRows(), cols = bflOsdCols();
+    const unsigned rows = bflOsdRows();
+    const unsigned stride = bflOsdCols();
+    // border literal and line buffer below cap the printable width
+    const unsigned cols = stride > 48 ? 48 : stride;
     const uint8_t *s = bflOsdScreen();
     printf("[osd] instance %u %s (draws=%u)\n", k, when, (unsigned)bflOsdDrawCount());
     printf("      +%.*s+\n", cols, "------------------------------------------------");
     for (unsigned y = 0; y < rows; y++) {
         char line[64];
         for (unsigned x = 0; x < cols; x++) {
-            const uint8_t c = s[y * cols + x];
+            const uint8_t c = s[y * stride + x];
             line[x] = (c >= 0x20 && c < 0x7f) ? (char)c : '.';
         }
         line[cols] = '\0';
@@ -249,7 +269,12 @@ int main(int argc, char *argv[])
         } else if (strcmp(argv[i], "--cli-dump") == 0 && i + 1 < argc) {
             cliDumpPath = argv[++i];
         } else if (strcmp(argv[i], "--instances") == 0 && i + 1 < argc) {
-            numInstances = atoi(argv[++i]);
+            const long v = atol(argv[++i]);
+            if (v < 1 || v > 1000000) {
+                fprintf(stderr, "invalid --instances '%s'\n", argv[i]);
+                return 1;
+            }
+            numInstances = (unsigned)v;
         } else if (strcmp(argv[i], "--perturb") == 0 && i + 1 < argc) {
             perturb = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--trace") == 0) {
@@ -282,6 +307,10 @@ int main(int argc, char *argv[])
     }
 
     insts = calloc(numInstances, sizeof(*insts));
+    if (!insts) {
+        fprintf(stderr, "[harness] out of memory for %u instances\n", numInstances);
+        return 1;
+    }
 
     // Boot every instance through the real init path
     for (unsigned k = 0; k < numInstances; k++) {
@@ -292,8 +321,11 @@ int main(int argc, char *argv[])
                 bflSetEepromPath(eepromBase);
             } else {
                 char *path = malloc(strlen(eepromBase) + 16);
+                if (!path) {
+                    return 1;
+                }
                 sprintf(path, "%s.%u", eepromBase, k);
-                bflSetEepromPath(path);
+                bflSetEepromPath(path); // retained by the firmware, not copied
             }
         }
 
@@ -316,8 +348,7 @@ int main(int argc, char *argv[])
             return rc;
         }
 
-        // Map ARM to AUX1 high (firmware-side helper: PG accessors are
-        // static-inline and must not be inlined into this native file)
+        // Map ARM to AUX1 high (firmware-side helper, see sitl_lockstep.c)
         bflConfigureArmSwitch();
 
         // OSD: with a layout-less config, enable the demo elements and
@@ -348,7 +379,7 @@ int main(int argc, char *argv[])
         for (unsigned k = 0; k < numInstances; k++) {
             controlStep(k);
         }
-        samples++;
+        controlSteps++;
         if (osdDump && (ms == 1000 || ms == 5000)) {
             char when[32];
             sprintf(when, "settle t=%ds", ms / 1000);
@@ -364,7 +395,7 @@ int main(int argc, char *argv[])
         for (unsigned k = 0; k < numInstances; k++) {
             controlStep(k);
         }
-        samples++;
+        controlSteps++;
     }
 
     for (unsigned k = 0; k < numInstances; k++) {
@@ -405,7 +436,7 @@ int main(int argc, char *argv[])
 
             controlStep(k);
         }
-        samples++;
+        controlSteps++;
 
         if (trace || (ms % 1000) == 0) {
             float m[4];
@@ -453,8 +484,8 @@ int main(int argc, char *argv[])
                insts[k].perturbed ? " (perturbed)" : "");
     }
 
-    printf("[harness] done: t=%ums samples=%llu instances=%u identical=%d\n",
-           (unsigned)(bflMicros() / 1000), (unsigned long long)samples,
+    printf("[harness] done: t=%ums control_steps=%llu instances=%u identical=%d\n",
+           (unsigned)(bflMicros() / 1000), (unsigned long long)controlSteps,
            numInstances, unperturbedIdentical);
     printf("TRACE_HASH: %016llx\n", (unsigned long long)refHash);
 

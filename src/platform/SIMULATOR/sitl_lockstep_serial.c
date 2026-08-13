@@ -33,9 +33,7 @@
 #include "drivers/serial.h"
 #include "drivers/serial_tcp.h"
 
-#define SINK_PORT_COUNT SERIAL_PORT_COUNT
-
-static serialPort_t sinkPorts[SINK_PORT_COUNT];
+static serialPort_t sinkPorts[SERIAL_PORT_COUNT];
 static unsigned sinkPortsUsed = 0;
 
 static void sinkWrite(serialPort_t *instance, uint8_t ch)
@@ -126,7 +124,7 @@ static const struct serialPortVTable sinkVTable = {
 
 serialPort_t *serTcpOpen(serialPortIdentifier_e identifier, serialReceiveCallbackPtr rxCallback, void *rxCallbackData, uint32_t baudRate, portMode_e mode, portOptions_e options)
 {
-    if (sinkPortsUsed >= SINK_PORT_COUNT) {
+    if (sinkPortsUsed >= SERIAL_PORT_COUNT) {
         return NULL;
     }
 

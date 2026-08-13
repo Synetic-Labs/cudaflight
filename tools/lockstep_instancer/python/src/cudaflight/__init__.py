@@ -4,7 +4,25 @@ The torch and JAX environment classes live in submodules (``torch_env``, ``jax_e
 and are not imported by default so the base wheel has no heavy dependencies.
 """
 
-from .lib import default_fatbin_path, default_lib_path, load
+from importlib.metadata import PackageNotFoundError, version
 
-__all__ = ["default_fatbin_path", "default_lib_path", "load"]
-__version__ = "0.1.0"
+from .lib import (
+    default_cpu_lib_path,
+    default_fatbin_path,
+    default_lib_path,
+    load,
+    load_cpu,
+)
+
+__all__ = [
+    "default_cpu_lib_path",
+    "default_fatbin_path",
+    "default_lib_path",
+    "load",
+    "load_cpu",
+]
+
+try:
+    __version__ = version("cudaflight")
+except PackageNotFoundError:  # running from a source tree, not an installed wheel
+    __version__ = "0.0.0"

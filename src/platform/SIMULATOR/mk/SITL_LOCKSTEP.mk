@@ -12,6 +12,8 @@ INCLUDE_DIRS := \
         $(TARGET_PLATFORM_DIR) \
         $(TARGET_PLATFORM_DIR)/include \
         $(LIB_MAIN_DIR)/dyad
+# dyad is needed for its header only (via drivers/serial_tcp.h); dyad.c
+# itself is not built — this target has no TCP serial backend.
 
 # sitl_lockstep_{main,physics,instance}.c are harness-side: the
 # multi-instance pipeline (tools/lockstep_instancer) compiles every other
@@ -25,7 +27,6 @@ MCU_COMMON_SRC  := \
         SIMULATOR/sitl_lockstep_instance.c \
         SIMULATOR/sitl_lockstep_main.c
 
-#Flags
 ARCH_FLAGS      =
 DEVICE_FLAGS    =
 LD_SCRIPT       = $(LINKER_DIR)/sitl.ld
@@ -48,7 +49,8 @@ MCU_EXCLUDES = \
 
 TARGET_MAP  = $(OBJECT_DIR)/$(FORKNAME)_$(TARGET).map
 
-LIBS        = -lm -lpthread -lc -lrt
+# no -lpthread/-lrt: unlike SITL there are no worker threads or timers
+LIBS        = -lm -lc
 
 LD_FLAGS    := \
             $(LIBS) \

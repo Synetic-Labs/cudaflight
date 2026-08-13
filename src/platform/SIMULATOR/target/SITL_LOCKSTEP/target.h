@@ -39,11 +39,8 @@
 // the firmware must run its own attitude estimation as on hardware.
 #define USE_IMU_CALC
 
-// Real quads fly with the dynamic notch on (whoop configs typically run
-// dyn_notch_count >= 1); simulator targets historically dropped it over
-// a long-gone arm_math.h dependency (see common_post.h), but for
-// sim-to-real the gyro filter chain must match hardware. Pure float
-// SDFT, deterministic, GPU-safe.
+// Simulator targets drop the dynamic notch in common_post.h; sim-to-real
+// needs the gyro filter chain to match hardware, so opt back in.
 #define USE_DYN_NOTCH_FILTER
 #define SIMULATOR_DYN_NOTCH
 

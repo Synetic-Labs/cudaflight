@@ -44,7 +44,7 @@ typedef struct quadSim_s {
     double yawDir;      // +1 default prop rotation, -1 yaw_motors_reversed
     bool onGround;
 
-    // last computed outputs (for telemetry)
+    // derived each step; accBody is the value injected into the firmware
     double thrust[4];   // per-motor thrust, N
     double accBody[3];  // specific force injected, m/s^2
 } quadSim_t;

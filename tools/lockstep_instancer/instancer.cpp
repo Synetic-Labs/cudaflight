@@ -518,7 +518,7 @@ int main(int argc, char **argv)
     }
 
     auto emitConstI64 = [&](StringRef name, uint64_t v) {
-        // If a declaration of this name already exists (e.g. device_diff.c
+        // If a declaration of this name already exists (e.g. device_flight.c
         // references __bf_image_size), DEFINE it in place. Creating a fresh
         // GlobalVariable with the same name would make LLVM rename the new one
         // (__bf_image_size.1), leaving the referenced symbol external/undefined

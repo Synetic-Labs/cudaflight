@@ -1,13 +1,16 @@
 # Build the cudaflight wheel.
 #
-#   make wheel        build the firmware then package
-#   make artifacts    just refresh the data files (skip wheel build)
-#   make firmware     just rebuild fw.fatbin / libcudaflight.so
-#   make clean        wipe build/, dist/, and the bundled data files
+#   make wheel         build both firmwares then package
+#   make artifacts     build both firmwares and copy the data files (skip the wheel)
+#   make firmware      just rebuild fw.fatbin / libcudaflight.so
+#   make firmware-cpu  just rebuild libcpuflight.so
+#   make release       build the wheel and upload it as a GitHub Release asset
+#   make clean         wipe build/, dist/, and the bundled data files
 #
-# The wheel ships fw.fatbin and libcudaflight.so under cudaflight/_data/
-# alongside the MAX7456 font from the firmware tree, so importlib.resources
-# resolves all runtime artifacts without reaching outside the wheel.
+# The wheel ships fw.fatbin, libcudaflight.so and libcpuflight.so under
+# cudaflight/_data/ alongside the MAX7456 font from the firmware tree, so
+# importlib.resources resolves all runtime artifacts without reaching
+# outside the wheel.
 
 ROOT       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../..)
 GPU_OUT    := $(ROOT)/obj/gpu
@@ -30,7 +33,7 @@ REPO       ?= synaptech-solutions/cudaflight
 TAG        := cudaflight-v$(VERSION)
 WHEEL      := dist/cudaflight-$(VERSION)-py3-none-linux_x86_64.whl
 
-.PHONY: all wheel firmware artifacts clean release
+.PHONY: all wheel firmware firmware-cpu artifacts clean release
 
 all: wheel
 
@@ -72,4 +75,4 @@ release: wheel
 
 clean:
 	rm -rf build dist *.egg-info src/*.egg-info
-	rm -f $(DATA)/libcudaflight.so $(DATA)/fw.fatbin $(DATA)/font_betaflight.c
+	rm -f $(DATA)/libcudaflight.so $(DATA)/libcpuflight.so $(DATA)/fw.fatbin $(DATA)/font_betaflight.c

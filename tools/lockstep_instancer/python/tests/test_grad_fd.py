@@ -15,7 +15,7 @@ import numpy as np
 
 from cudaflight.lib import default_fatbin_path, load
 
-EPS = 1e-2
+EPS = 1e-2  # FD step, normalised action units
 
 
 def main():
@@ -33,8 +33,10 @@ def main():
         getattr(lib, name).restype = res
         getattr(lib, name).argtypes = args
 
-    fptr = lambda a: a.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-    n = 8
+    def fptr(a: np.ndarray) -> "ctypes._Pointer[ctypes.c_float]":
+        return a.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+
+    n = 8  # >= 3: relocation discovery needs three instances
     cubin = str(default_fatbin_path())
     h = lib.cudaflight_create_eeprom(cubin.encode(), n, 0, 0, None)
     if not h:
@@ -72,8 +74,9 @@ def main():
         print(J)
         print(f"\nthrottle column (collective, expect same sign): {J[:, 2]}")
         print(f"roll column (differential, expect mixed sign):  {J[:, 0]}")
-        print("\nPASS: nonzero gradients through the real control law"
-              if np.any(J != 0) else "\nFAIL: gradient is all zero")
+        if not np.any(J != 0):
+            raise SystemExit("FAIL: gradient is all zero")
+        print("\nPASS: nonzero gradients through the real control law")
     finally:
         lib.cudaflight_destroy(h)
 

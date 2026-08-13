@@ -4,7 +4,7 @@ Python wheel packaging the real Betaflight firmware compiled to NVPTX
 (`fw.fatbin`) and the CUDA driver-API host library (`libcudaflight.so`) into a
 single, pip-installable artifact.
 
-The wheel is **architecture-locked** to Linux x86_64 with CUDA 12.x. The
+The wheel is **architecture-locked** to Linux x86_64 with CUDA 12.x+. The
 fatbin contains cubins for the SMs listed in `ARCHS` at build time
 (default: `sm_89 sm_120` — RTX 4090, RTX 5090, RTX PRO 6000).
 
@@ -30,9 +30,9 @@ ARCHS="sm_80 sm_89 sm_90 sm_120" \
 From a local build:
 
 ```bash
-pip install dist/cudaflight-0.1.0-py3-none-linux_x86_64.whl
+pip install dist/cudaflight-0.2.1-py3-none-linux_x86_64.whl
 # or with extras:
-pip install "cudaflight[jax] @ file:///abs/path/to/dist/cudaflight-0.1.0-py3-none-linux_x86_64.whl"
+pip install "cudaflight[jax] @ file:///abs/path/to/dist/cudaflight-0.2.1-py3-none-linux_x86_64.whl"
 ```
 
 The wheel is tagged `py3-none-linux_x86_64`: ABI-agnostic (no CPython
@@ -52,7 +52,7 @@ This creates (or re-uploads to) the `cudaflight-v<version>` release on
 `synaptech-solutions/cudaflight`. Install directly from the asset URL:
 
 ```bash
-pip install https://github.com/synaptech-solutions/cudaflight/releases/download/cudaflight-v0.1.0/cudaflight-0.1.0-py3-none-linux_x86_64.whl
+pip install https://github.com/synaptech-solutions/cudaflight/releases/download/cudaflight-v0.2.1/cudaflight-0.2.1-py3-none-linux_x86_64.whl
 ```
 
 Or pin it as a dependency (works with pip and uv):
@@ -60,7 +60,7 @@ Or pin it as a dependency (works with pip and uv):
 ```toml
 # pyproject.toml of the consuming project
 dependencies = [
-  "cudaflight @ https://github.com/synaptech-solutions/cudaflight/releases/download/cudaflight-v0.1.0/cudaflight-0.1.0-py3-none-linux_x86_64.whl",
+  "cudaflight @ https://github.com/synaptech-solutions/cudaflight/releases/download/cudaflight-v0.2.1/cudaflight-0.2.1-py3-none-linux_x86_64.whl",
 ]
 ```
 
@@ -72,10 +72,11 @@ dependencies = [
 ## Using
 
 ```python
-from cudaflight import default_fatbin_path, default_lib_path, load
-from cudaflight.cudaflight_jax import BetaflightJaxEnv
+from cudaflight.jax_env import BetaflightJaxEnv    # [jax] extra
+env = BetaflightJaxEnv(num_envs=256)   # picks up the packaged fatbin + .so
 
-env = BetaflightJaxEnv(num_envs=256)  # picks up the packaged fatbin + .so
+from cudaflight.torch_env import BetaflightEnv     # [torch] extra
+env = BetaflightEnv(num_envs=256)      # zero-copy CUDA tensor views
 ```
 
 Override the bundled artifacts (for in-place rebuilds without reinstalling):
@@ -84,3 +85,11 @@ Override the bundled artifacts (for in-place rebuilds without reinstalling):
 export CUDAFLIGHT_LIB=/path/to/built/libcudaflight.so
 export CUDAFLIGHT_FATBIN=/path/to/built/fw.fatbin
 ```
+
+## Backends and extras
+
+The wheel also bundles `libcpuflight.so`, a no-CUDA CPU fleet backend for
+small interactive fleets (`cudaflight.load_cpu()`, overridable via
+`CPUFLIGHT_LIB`). Extras: `[jax]` (CUDA jax for `BetaflightJaxEnv`),
+`[torch]` (for `BetaflightEnv`), `[viz]` (torch + pygame + pillow for the
+`wall-of-betaflight` OSD-wall demo installed as a console script).

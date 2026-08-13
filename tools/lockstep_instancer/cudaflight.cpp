@@ -16,7 +16,7 @@
 
 #include <cstdint>
 #include <cstdio>
-#include <cstring>
+#include <cstdlib>
 #include <utility>
 #include <vector>
 
@@ -45,8 +45,8 @@ struct cudaflight {
     CUcontext ctx;          // primary context, retained
     CUmodule mod;
     CUfunction fInit, fBoot, fRun, fFinish, fSnapshot, fReset, fStep, fFwStep;
-    CUfunction fOsd, fGradFD, fRateEval, fJacFD, fSetBase, fGrad;
-    CUfunction fJacFDPure, fJacGradPure;  // value-threaded (rebase-aware) Jacobians
+    CUfunction fOsd, fGradFD, fRateEval, fJacFD, fSetBase;
+    CUfunction fJacFDPure;          // value-threaded (rebase-aware) Jacobian
     CUfunction fSetAux;             // host-driven AUX RC channels (optional)
     uint32_t n;
     unsigned grid, block;
@@ -55,6 +55,7 @@ struct cudaflight {
     CUdeviceptr instBuf, stateBuf, snapBuf, snapStBuf;
     CUdeviceptr actBuf, obsBuf, rewBuf, doneBuf;
     CUdeviceptr hashBuf, altBuf, armedBuf;
+    CUdeviceptr onesMask;           // constant all-ones [n] mask for reset_all
     CUdeviceptr sensBuf, motorBuf;  // external-physics exchange: [n x 7] in, [n x 4] out
     CUdeviceptr auxBuf;             // host-driven AUX RC channels: [n x auxDim] us floats
     CUdeviceptr osdBuf, osdAttrBuf; // OSD char grids: [n x rows*cols] u8 each
@@ -188,11 +189,13 @@ static int discoverRelocs(cudaflight *g)
 
     int err = 0;
     const uint64_t staticCount = readU64(g, "__bf_reloc_count", &err);
-    printf("[cudaflight-reloc] discovered %zu self-pointers (static table had %llu; "
-           "%lld runtime-written recovered), %llu inconsistent words\n",
-           table.size(), (unsigned long long)staticCount,
-           (long long)table.size() - (long long)(err ? 0 : staticCount),
-           (unsigned long long)inconsistent);
+    if (getenv("CUDAFLIGHT_VERBOSE")) {
+        fprintf(stderr, "[cudaflight-reloc] discovered %zu self-pointers (static table had %llu; "
+                "%lld runtime-written recovered), %llu inconsistent words\n",
+                table.size(), (unsigned long long)staticCount,
+                (long long)table.size() - (long long)(err ? 0 : staticCount),
+                (unsigned long long)inconsistent);
+    }
     if (inconsistent) {
         // Any inconsistency means the arithmetic-progression assumption was
         // violated for some word — discovery cannot be trusted as complete.
@@ -218,7 +221,9 @@ static int discoverRelocs(cudaflight *g)
         writeGlobal(g, "__bf_full_reloc_count", &g->fullRelocCount, sizeof(g->fullRelocCount))) {
         return -1;
     }
-    printf("[cudaflight-reloc] PASS: complete reloc table validated across 3 instances\n");
+    if (getenv("CUDAFLIGHT_VERBOSE")) {
+        fprintf(stderr, "[cudaflight-reloc] PASS: complete reloc table validated across 3 instances\n");
+    }
     return 0;
 }
 
@@ -237,7 +242,7 @@ void cudaflight_destroy(cudaflight *g)
     cuCtxPushCurrent(g->ctx);
     for (CUdeviceptr p : { g->instBuf, g->stateBuf, g->snapBuf, g->snapStBuf,
                            g->actBuf, g->obsBuf, g->rewBuf, g->doneBuf,
-                           g->hashBuf, g->altBuf, g->armedBuf,
+                           g->hashBuf, g->altBuf, g->armedBuf, g->onesMask,
                            g->sensBuf, g->motorBuf, g->osdBuf, g->osdAttrBuf,
                            g->seedBuf, g->dactBuf, g->gradScratch, g->fullRelocBuf,
                            g->auxBuf }) {
@@ -260,23 +265,17 @@ void cudaflight_destroy(cudaflight *g)
 // validated harness schedule. eeprom_path optionally names a boot-ready
 // config image (from the CPU harness's --cli-dump converter) preloaded
 // into every instance's RAM EEPROM before boot, so the fleet flies that
-// configuration instead of defaults. Returns NULL on failure (see
-// cudaflight_error).
-// Full create. with_grad allocates the differentiable-rollout scratch buffers
-// (seedBuf/dactBuf, and crucially gradScratch = stride*n — a per-instance blob
-// save-slot as large as the entire instance array). PPO does NOT use them, so
-// passing with_grad=0 nearly halves the dominant per-instance memory and lets a
-// far larger fleet fit. The plain cudaflight_create_eeprom() wrapper keeps with_grad=1
-// for ABI compatibility (grad harnesses / the differentiable env).
+// configuration instead of defaults. with_grad=0 skips the FD-gradient
+// scratch buffers (see their allocation below). Returns NULL on failure
+// (see cudaflight_error).
 cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int device,
-                              uint32_t settle_ms, const char *eeprom_path,
-                              int with_grad)
+                                        uint32_t settle_ms, const char *eeprom_path,
+                                        int with_grad)
 {
     if (settle_ms == 0) {
         settle_ms = 7000;
     }
     cudaflight *g = new cudaflight();
-    memset(g, 0, sizeof(*g));
     g->n = n;
     g->block = 32;
     g->grid = (n + g->block - 1) / g->block;
@@ -298,28 +297,6 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
         cudaflight_destroy(g);
         return nullptr;
     }
-    // The Enzyme reverse-mode kernels (bfFwStepGrad / bfFwStepJacGradPure)
-    // heap-allocate their value tape via device malloc (hundreds of small
-    // enzyme_cache_alloc per thread); the default 8 MB device heap is too small
-    // once many instances run at once, and an out-of-heap malloc returns null ->
-    // illegal address. Size it up — but best-effort: CU_LIMIT_MALLOC_HEAP_SIZE is
-    // locked once the context is initialized, and we usually share XLA's primary
-    // context (which jax touches before cudaflight_create), so the call returns
-    // INVALID_VALUE. That is non-fatal: the heap keeps its current size, which is
-    // ample for the small fleets used in tests/grad checks. To guarantee the
-    // larger heap under XLA, set it before jax initializes — e.g. export
-    // XLA_PYTHON_CLIENT_PREALLOCATE=false and create the env before any jax op,
-    // or raise it via the driver in the host process first.
-    const CUresult heapRc = cuCtxSetLimit(CU_LIMIT_MALLOC_HEAP_SIZE, (size_t)128 << 20);
-    if (heapRc != CUDA_SUCCESS) {
-        const char *msg = nullptr;
-        cuGetErrorString(heapRc, &msg);
-        fprintf(stderr, "[cudaflight] note: could not enlarge device malloc heap to "
-                "128 MB (%s); keeping current size — fine for small fleets, but "
-                "large Enzyme-gradient fleets may exhaust the default 8 MB heap\n",
-                msg ? msg : "?");
-    }
-
     int err = 0;
     g->imageSize = readU64(g, "__bf_image_size", &err);
     uint64_t align = readU64(g, "__bf_image_align", &err);
@@ -357,6 +334,8 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
         cuOk(cuMemAlloc(&g->hashBuf, 8 * n), "alloc hashes") &&
         cuOk(cuMemAlloc(&g->altBuf, 4 * n), "alloc alt") &&
         cuOk(cuMemAlloc(&g->armedBuf, n), "alloc armed") &&
+        cuOk(cuMemAlloc(&g->onesMask, n), "alloc ones mask") &&
+        cuOk(cuMemsetD8(g->onesMask, 1, n), "init ones mask") &&
         cuOk(cuMemAlloc(&g->sensBuf, 4 * 7 * n), "alloc sensors") &&
         cuOk(cuMemAlloc(&g->motorBuf, 4 * 4 * n), "alloc motors") &&
         cuOk(cuMemAlloc(&g->osdBuf, g->osdRows * g->osdCols * n), "alloc osd") &&
@@ -389,7 +368,7 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
         }
     }
 
-    // Differentiable-rollout scratch — only when requested. gradScratch alone is
+    // FD-gradient scratch — only when requested. gradScratch alone is
     // stride*n (as big as the whole instance array), so skipping it for PPO is
     // the difference between fitting ~1.5x more worlds and OOMing. Left null
     // otherwise; cudaflight_destroy's free loop tolerates null (cuMemFree(0) no-ops).
@@ -420,11 +399,8 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
          cuOk(cuModuleGetFunction(&g->fStep, g->mod, "bfStep"), "bfStep") &&
          cuOk(cuModuleGetFunction(&g->fFwStep, g->mod, "bfFwStep"), "bfFwStep") &&
          cuOk(cuModuleGetFunction(&g->fOsd, g->mod, "bfOsdSnapshot"), "bfOsdSnapshot") &&
-         // Value-threaded (rebase-aware) Jacobians for the differentiable rollout.
-         // Both are part of the canonical build (DIFF=1); the Python package picks
-         // which one the custom_vjp uses at runtime (Enzyme by default, FD oracle).
-         cuOk(cuModuleGetFunction(&g->fJacFDPure, g->mod, "bfFwStepJacFDPure"), "bfFwStepJacFDPure") &&
-         cuOk(cuModuleGetFunction(&g->fJacGradPure, g->mod, "bfFwStepJacGradPure"), "bfFwStepJacGradPure");
+         // Value-threaded (rebase-aware) FD Jacobian for the differentiable rollout.
+         cuOk(cuModuleGetFunction(&g->fJacFDPure, g->mod, "bfFwStepJacFDPure"), "bfFwStepJacFDPure");
     if (!ok) {
         cudaflight_destroy(g);
         return nullptr;
@@ -437,8 +413,6 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
     cuModuleGetFunction(&g->fSetBase, g->mod, "bfSetBase");
     // Optional: the AUX-channel writer (present when built with bfSetAux).
     cuModuleGetFunction(&g->fSetAux, g->mod, "bfSetAux");
-    // Optional: the Enzyme reverse-mode VJP kernel (present when built DIFF=1).
-    cuModuleGetFunction(&g->fGrad, g->mod, "bfFwStepGrad");
 
     uint32_t perturb = UINT32_MAX;
     void *initArgs[] = { &g->stateBuf, &perturb };
@@ -525,13 +499,13 @@ cudaflight *cudaflight_create_eeprom_ex(const char *cubin_path, uint32_t n, int 
     return g;
 }
 
-// Eeprom create, kept for ABI compatibility — grad buffers ON (the grad harness
-// and any caller of the old 5-arg symbol get the differentiable scratch).
+// Eeprom create, kept for ABI compatibility — callers of the old 5-arg
+// symbol get the gradient scratch buffers.
 cudaflight *cudaflight_create_eeprom(const char *cubin_path, uint32_t n, int device,
-                           uint32_t settle_ms, const char *eeprom_path)
+                                     uint32_t settle_ms, const char *eeprom_path)
 {
     return cudaflight_create_eeprom_ex(cubin_path, n, device, settle_ms, eeprom_path,
-                                  /*with_grad=*/1);
+                                       /*with_grad=*/1);
 }
 
 // Default-config create, kept for ABI compatibility.
@@ -577,11 +551,7 @@ int cudaflight_reset_done(cudaflight *g)
 
 int cudaflight_reset_all(cudaflight *g)
 {
-    CtxGuard guard(g->ctx);
-    // reuse armedBuf as an all-ones mask; it is 1 everywhere after create
-    // but may be stale, so rewrite it
-    CUTRY(cuMemsetD8(g->armedBuf, 1, g->n));
-    return cudaflight_reset_mask(g, (uint64_t)g->armedBuf);
+    return cudaflight_reset_mask(g, (uint64_t)g->onesMask);
 }
 
 // Retake the episode-start snapshot at the current state (curriculum /
@@ -633,9 +603,9 @@ uint64_t cudaflight_sensors_ptr(cudaflight *g) { return (uint64_t)g->sensBuf; }
 uint64_t cudaflight_motors_ptr(cudaflight *g) { return (uint64_t)g->motorBuf; }
 uint64_t cudaflight_armed_ptr(cudaflight *g) { return (uint64_t)g->armedBuf; }
 
-// Copy sensors (float32 [n, 7]: gyro NED rad/s, specific force NED m/s^2,
-// baro Pa) from another device buffer. Caller must ensure the source is
-// fully written before calling.
+// Copy sensors (float32 [n, 7]: body-frame (FRD) gyro rad/s, specific
+// force m/s^2, baro Pa) from another device buffer. Caller must ensure
+// the source is fully written before calling.
 int cudaflight_write_sensors(cudaflight *g, uint64_t src_devptr)
 {
     CtxGuard guard(g->ctx);
@@ -818,24 +788,19 @@ uint64_t cudaflight_snap_ptr(cudaflight *g) { return (uint64_t)g->snapBuf; }
 // jacOut[N,16], scratch, eps) computes J[k][i][d] = d(motor_i)/d(action_d) of
 // the real control law at the current per-instance state. gradScratch is the
 // per-instance blob save buffer the kernel uses for state restore.
+// These lookups are optional at create; a getter returns 0 when the module
+// lacks the kernel — callers must check before launching.
 uint64_t cudaflight_jac_fd_kernel(cudaflight *g) { return (uint64_t)g->fJacFD; }
 uint64_t cudaflight_grad_scratch_ptr(cudaflight *g) { return (uint64_t)g->gradScratch; }
 
-// Raw launch params for the value-threaded ("pure") Jacobian FFIs used by the
-// differentiable rollout's custom_vjp. Both rebase the donated blob on entry
-// (bfSetBase must point __bf_inst_base at it first) and write the full
+// Raw launch param for the value-threaded ("pure") Jacobian FFI used by the
+// differentiable rollout's custom_vjp. It rebases the donated blob on entry
+// (bfSetBase must point __bf_inst_base at it first) and writes the full
 // jacOut[N,16], J[k][i][d] = d(motor_i)/d(action_d) at the pre-step state:
-//   bfFwStepJacFDPure(actions[N,4], jacOut[N,16], scratch, eps)  — finite diff
-//   bfFwStepJacGradPure(actions[N,4], jacOut[N,16], scratch)     — Enzyme reverse
-// Both share gradScratch for the per-instance state save/restore.
+//   bfFwStepJacFDPure(actions[N,4], jacOut[N,16], scratch, eps, col)
+// col < 0 computes the full Jacobian, col in [0,3] a single action column.
+// gradScratch holds the per-instance state save/restore.
 uint64_t cudaflight_jac_fd_pure_kernel(cudaflight *g) { return (uint64_t)g->fJacFDPure; }
-uint64_t cudaflight_jac_grad_pure_kernel(cudaflight *g) { return (uint64_t)g->fJacGradPure; }
-
-// Raw launch param for the in-jit Enzyme VJP FFI: bfFwStepGrad(actions[N,4],
-// seedMotors[N,4], dActions[N,4]) computes dActions = J^T . seedMotors of the
-// real control law at the current per-instance state (reverse-mode autodiff).
-// 0 if the module was not built DIFF=1.
-uint64_t cudaflight_grad_kernel(cudaflight *g) { return (uint64_t)g->fGrad; }
 
 // Self-test for position-independent relocation: run a deterministic burst from
 // the snapshot, relocate the whole fleet's blobs to a freshly allocated buffer

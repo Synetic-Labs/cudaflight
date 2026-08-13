@@ -22,6 +22,13 @@ README.pdf
 # artefacts of top-level Makefile
 /downloads/
 /build/
+# downloaded toolchains (make arm_sdk_install) land in /tools;
+# only the fork's source directories are tracked
+/tools/*
+!/tools/lockstep_instancer/
+!/tools/realtime_server/
+# binaries rebuilt by build_gpu.sh / build_multi.sh
+/tools/lockstep_instancer/instancer
 # local changes only
 mk/local.mk
 
@@ -57,8 +64,8 @@ eeprom.bin
 
 __pycache__/
 
-# Local Enzyme checkout (upstream clone + patches; see tools/enzyme_patches/)
-/tools/Enzyme/
+# MuJoCo warning log (created by external-physics backends)
+MUJOCO_LOG.TXT
 
 # config used for building targets
 # changed to submodule
@@ -70,4 +77,3 @@ __pycache__/
 AGENTS.md
 CLAUDE.md
 /tasks
-ob_dl/*

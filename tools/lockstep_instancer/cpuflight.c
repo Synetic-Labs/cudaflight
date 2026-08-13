@@ -101,7 +101,7 @@ void cpuflight_destroy(cpuflight *g)
 
 cpuflight *cpuflight_create_eeprom(uint32_t n, uint32_t settle_ms, const char *eeprom_path)
 {
-    if (n < 1) {
+    if (n == 0) {
         snprintf(g_err, sizeof(g_err), "fleet size must be >= 1 (got %u)", n);
         return NULL;
     }
@@ -310,8 +310,8 @@ int cpuflight_snapshot(cpuflight *g)
     return 0;
 }
 
-// Restore the flagged instances (u8 mask, cudaflight_reset layout) to the
-// episode-start snapshot. Same-address restore: no pointer rebasing needed.
+// Restore the flagged instances (u8 mask, cudaflight_reset_mask layout) to
+// the episode-start snapshot. Same-address restore: no pointer rebasing needed.
 int cpuflight_reset_mask(cpuflight *g, const uint8_t *mask)
 {
     for (uint32_t k = 0; k < g->n; k++) {
@@ -329,10 +329,16 @@ int cpuflight_reset_mask(cpuflight *g, const uint8_t *mask)
     return 0;
 }
 
-void cpuflight_reset_all(cpuflight *g)
+int cpuflight_reset_all(cpuflight *g)
 {
     for (uint32_t k = 0; k < g->n; k++) {
-        memcpy(bflInstanceBlob(k), g->snapBlobs + (size_t)k * g->imageSize, g->imageSize);
+        char *blob = bflInstanceBlob(k);
+        if (!blob) {
+            snprintf(g_err, sizeof(g_err), "instance %u has no blob", k);
+            return -1;
+        }
+        memcpy(blob, g->snapBlobs + (size_t)k * g->imageSize, g->imageSize);
         g->inst[k] = g->snapInst[k];
     }
+    return 0;
 }

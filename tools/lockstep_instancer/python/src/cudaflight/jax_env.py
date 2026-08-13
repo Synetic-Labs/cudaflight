@@ -11,9 +11,9 @@ XLA and libcudaflight share the device's primary CUDA context, and every
 library call fully synchronizes the context on entry and exit, so XLA's
 non-blocking streams are ordered against the firmware kernels.
 
-NOTE: import this module (or set XLA_PYTHON_CLIENT_PREALLOCATE=false)
-before JAX touches the GPU — by default XLA preallocates 75% of device
-memory, which collides with the firmware's instance blobs and the 8GB
+Import this module (or set XLA_PYTHON_CLIENT_PREALLOCATE=false) before
+JAX touches the GPU — by default XLA preallocates 75% of device memory,
+which collides with the firmware's instance blobs and the 8GB
 device-stack reservation.
 
 Semantics (gymnasium NextStep-style auto-reset, like the torch wrapper):
@@ -28,11 +28,13 @@ import os
 
 os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
-import jax
-import jax.numpy as jnp
+import jax  # noqa: E402
+import jax.numpy as jnp  # noqa: E402
+import numpy as np  # noqa: E402
+from jax.typing import ArrayLike  # noqa: E402
 
-from .lib import default_fatbin_path as _default_fatbin
-from .lib import load as _load
+from .lib import default_fatbin_path as _default_fatbin  # noqa: E402
+from .lib import load as _load  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Minimal DLPack producer for a raw CUDA device pointer, so jnp.from_dlpack
@@ -89,12 +91,13 @@ ctypes.pythonapi.PyCapsule_New.argtypes = [ctypes.c_void_p, ctypes.c_char_p, cty
 class _DevicePointer:
     """__dlpack__ exporter for a raw device pointer we keep ownership of."""
 
-    def __init__(self, ptr, shape, code, bits, device_id):
+    def __init__(self, ptr: int, shape: "tuple[int, ...]", code: int,
+                 bits: int, device_id: int) -> None:
         self._ptr, self._shape = ptr, tuple(shape)
         self._code, self._bits = code, bits
         self._device_id = device_id
 
-    def __dlpack_device__(self):
+    def __dlpack_device__(self) -> "tuple[int, int]":
         return (_KDL_CUDA, self._device_id)
 
     def __dlpack__(self, **kwargs):
@@ -120,8 +123,12 @@ class _DevicePointer:
 
 
 class BetaflightJaxEnv:
-    def __init__(self, num_envs, cubin=None, lib=None, decimation=10,
-                 device_index=0, settle_ms=0, auto_reset=True, eeprom=None):
+    def __init__(self, num_envs: int,
+                 cubin: "str | os.PathLike[str] | None" = None,
+                 lib: "str | os.PathLike[str] | None" = None,
+                 decimation: int = 10, device_index: int = 0,
+                 settle_ms: int = 0, auto_reset: bool = True,
+                 eeprom: "str | os.PathLike[str] | None" = None) -> None:
         self.decimation = decimation
         self.auto_reset = auto_reset
         self.device = jax.devices("gpu")[device_index]
@@ -130,8 +137,6 @@ class BetaflightJaxEnv:
 
         self._lib = _load(lib)
         cubin = str(cubin or _default_fatbin())
-        # eeprom: boot-ready config image from the CPU --cli-dump converter
-        # (e.g. a real quad's CLI dump); None boots defaults
         self._h = self._lib.cudaflight_create_eeprom(
             cubin.encode(), num_envs, device_index, settle_ms,
             str(eeprom).encode() if eeprom else None)
@@ -150,20 +155,20 @@ class BetaflightJaxEnv:
         self._done_view = _DevicePointer(
             self._lib.cudaflight_dones_ptr(self._h), (n,), _KDL_UINT, 8, device_index)
 
-    def _check(self, rc):
+    def _check(self, rc: int) -> None:
         if rc != 0:
             raise RuntimeError(self._lib.cudaflight_error().decode())
 
-    def _snap(self, view):
+    def _snap(self, view: _DevicePointer) -> jax.Array:
         # zero-copy DLPack view of the live buffer, then an owned copy so
         # the returned array is a value, not an alias the next step mutates
         return jnp.copy(jnp.from_dlpack(view))
 
-    def _outputs(self):
+    def _outputs(self) -> "tuple[jax.Array, jax.Array, jax.Array]":
         return (self._snap(self._obs_view), self._snap(self._rew_view),
                 self._snap(self._done_view).astype(jnp.bool_))
 
-    def _upload_actions(self, actions):
+    def _upload_actions(self, actions: ArrayLike) -> None:
         actions = jnp.asarray(actions, jnp.float32)
         if actions.shape != (self.num_envs, self.act_dim):
             raise ValueError(f"actions must be [{self.num_envs}, {self.act_dim}]")
@@ -172,19 +177,18 @@ class BetaflightJaxEnv:
             ptr = actions.__cuda_array_interface__["data"][0]
             self._check(self._lib.cudaflight_write_actions(self._h, ptr))
         except AttributeError:  # CAI export unavailable: bounce via host
-            import numpy as np
             host = np.asarray(actions, dtype=np.float32)
             self._check(self._lib.cudaflight_write_actions_host(
                 self._h, host.ctypes.data_as(ctypes.POINTER(ctypes.c_float))))
 
-    def reset(self):
+    def reset(self) -> jax.Array:
         """Restore every instance to the armed snapshot; returns obs."""
         self._check(self._lib.cudaflight_reset_all(self._h))
         self._upload_actions(jnp.zeros((self.num_envs, self.act_dim), jnp.float32))
         self._check(self._lib.cudaflight_step(self._h, 0))  # refresh obs, no sim advance
         return self._snap(self._obs_view)
 
-    def step(self, actions):
+    def step(self, actions: ArrayLike) -> "tuple[jax.Array, jax.Array, jax.Array]":
         """Advance decimation control steps; returns (obs, rewards, dones)."""
         self._upload_actions(actions)
         self._check(self._lib.cudaflight_step(self._h, self.decimation))
@@ -193,26 +197,30 @@ class BetaflightJaxEnv:
             self._check(self._lib.cudaflight_reset_done(self._h))
         return out
 
-    def reset_mask(self, mask):
-        """Restore instances where mask ([N] bool/uint8) is nonzero."""
+    def reset_mask(self, mask: ArrayLike) -> None:
+        """Restore instances where mask ([N] bool/uint8) is nonzero.
+
+        The mask must land on the GPU (CUDA array interface); unlike
+        step() there is no host bounce path.
+        """
         mask = jax.block_until_ready(jnp.asarray(mask, jnp.uint8))
         self._check(self._lib.cudaflight_reset_mask(
             self._h, mask.__cuda_array_interface__["data"][0]))
 
-    def snapshot(self):
+    def snapshot(self) -> None:
         """Retake the episode-start snapshot at the current state."""
         self._check(self._lib.cudaflight_snapshot(self._h))
 
-    def hashes(self):
+    def hashes(self) -> "list[int]":
         """Per-instance motor-trace hashes (the determinism oracle)."""
         out = (ctypes.c_uint64 * self.num_envs)()
         self._check(self._lib.cudaflight_hashes(self._h, out))
         return list(out)
 
-    def close(self):
+    def close(self) -> None:
         if getattr(self, "_h", None):
             self._lib.cudaflight_destroy(self._h)
             self._h = None
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.close()

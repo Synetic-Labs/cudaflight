@@ -65,15 +65,22 @@ static void quatRotateInv(const double q[4], const double v[3], double out[3])
     quatRotate(qc, v, out);
 }
 
+// Inject the current body rates, specific force and barometric pressure
+// into the firmware's virtual sensors.
+static void injectSensors(const quadSim_t *sim)
+{
+    bflSetGyroAccel(sim->omega[0], sim->omega[1], sim->omega[2],
+                    sim->accBody[0], sim->accBody[1], sim->accBody[2]);
+    bflSetBaro((int32_t)lrint(SEA_LEVEL_PA * exp(sim->pos[2] / BARO_SCALE_M)));
+}
+
 void quadSimInit(quadSim_t *sim)
 {
     memset(sim, 0, sizeof(*sim));
     sim->q[0] = 1.0;
     sim->onGround = true;
     sim->accBody[2] = -GRAVITY_MSS;
-    // must be called after firmware init: with yaw_motors_reversed the
-    // real airframe's props spin opposite to default and the firmware
-    // negates its yaw mixer column, so the reaction torques flip too
+    // must run after firmware init (see bflYawMotorsReversed)
     sim->yawDir = bflYawMotorsReversed() ? -1.0 : 1.0;
 }
 
@@ -94,11 +101,11 @@ void quadSimStep(quadSim_t *sim, double dt)
     }
 
     if (sim->onGround && thrustTotal <= MASS_KG * GRAVITY_MSS) {
-        // sitting on the ground: no motion, gravity-only specific force
+        // sitting on the ground: no motion (omega is zero here),
+        // gravity-only specific force
         const double gWorld[3] = { 0.0, 0.0, -GRAVITY_MSS };
         quatRotateInv(sim->q, gWorld, sim->accBody);
-        bflSetGyroAccel(0.0, 0.0, 0.0, sim->accBody[0], sim->accBody[1], sim->accBody[2]);
-        bflSetBaro((int32_t)lrint(SEA_LEVEL_PA * exp(sim->pos[2] / BARO_SCALE_M)));
+        injectSensors(sim);
         return;
     }
     sim->onGround = false;
@@ -122,7 +129,9 @@ void quadSimStep(quadSim_t *sim, double dt)
     sim->omega[1] += tau[1] / IYY * dt;
     sim->omega[2] += tau[2] / IZZ * dt;
 
-    // attitude: q_dot = 0.5 * q (x) (0, omega)
+    // attitude: q_dot = 0.5 * q (x) (0, omega). `w` aliases sim->omega, so
+    // this deliberately integrates the just-updated rates (semi-implicit
+    // Euler) — the damping terms above used the pre-update values.
     {
         const double *q = sim->q;
         const double dq[4] = {
@@ -179,9 +188,7 @@ void quadSimStep(quadSim_t *sim, double dt)
         sim->accBody[2] = -thrustTotal / MASS_KG + dragBody[2] / MASS_KG;
     }
 
-    bflSetGyroAccel(sim->omega[0], sim->omega[1], sim->omega[2],
-                    sim->accBody[0], sim->accBody[1], sim->accBody[2]);
-    bflSetBaro((int32_t)lrint(SEA_LEVEL_PA * exp(sim->pos[2] / BARO_SCALE_M)));
+    injectSensors(sim);
 }
 
 double quadSimAltitude(const quadSim_t *sim)

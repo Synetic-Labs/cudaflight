@@ -1,1 +1,0 @@
-cmd='sh;-c;cp sys/gsl_sys.h . && cp cblas/gsl_cblas.h . && rm cblas/test*.c && echo > config.h'

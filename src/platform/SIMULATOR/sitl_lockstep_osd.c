@@ -41,8 +41,8 @@
 
 #include "sitl_lockstep.h"
 
-#define OSD_SCREEN_ROWS VIDEO_LINES_PAL    // 16
-#define OSD_SCREEN_COLS VIDEO_COLUMNS_SD   // 30
+#define OSD_SCREEN_ROWS VIDEO_LINES_PAL
+#define OSD_SCREEN_COLS VIDEO_COLUMNS_SD
 
 // Font index per cell (MAX7456-style: 0x20 = blank) and the displayport
 // attribute per cell (severity in the low bits, DISPLAYPORT_BLINK in
@@ -196,10 +196,8 @@ void bflOsdDefaultCraftName(const char *name)
     }
 }
 
-// Stock config disables every element (positions centred, no profile
-// flag), which would make the wall blank after the boot logo. If — and
-// only if — the active config enables nothing (i.e. no real-quad dump
-// with its own layout was loaded), switch on a classic FPV layout.
+// Stock defaults enable no OSD elements; apply a classic FPV layout only
+// when the loaded config has none of its own.
 void bflOsdApplyDemoLayoutIfBlank(void)
 {
     osdElementConfig_t *cfg = osdElementConfigMutable();

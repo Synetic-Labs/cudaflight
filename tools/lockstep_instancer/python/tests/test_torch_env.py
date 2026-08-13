@@ -7,7 +7,7 @@
      obs/action tensors alone — every torch op runs on the GPU
   C  crash + auto-reset: throttle cut raises dones, auto-reset restores
 
-Run: python test_cudaflight.py [num_envs]
+Run: python test_torch_env.py [num_envs]
 """
 
 import sys
@@ -50,7 +50,7 @@ def main():
     actions[:, 2] = 0.6  # initial climb
     t0 = time.time()
     for _ in range(1000):  # 10s sim at decimation 10
-        obs, rew, done = env.step(actions)
+        obs, _, done = env.step(actions)
         alt = -obs[:, 2]
         vz_up = -obs[:, 5]
         actions[:, 2] = (0.36 + 0.22 * (5.0 - alt) - 0.12 * vz_up).clamp(-1, 1)
@@ -71,7 +71,7 @@ def main():
     actions[:, 2] = -1.0
     crashed = False
     for i in range(300):
-        obs, rew, done = env.step(actions)
+        obs, _, done = env.step(actions)
         if bool(done.all().item()):
             crashed = True
             break
@@ -79,7 +79,7 @@ def main():
     ok = ok and crashed
     # auto-reset already restored them; next step must be grounded, not done
     actions[:, 2] = 0.36
-    obs, rew, done = env.step(actions)
+    obs, _, done = env.step(actions)
     grounded = bool(((-obs[:, 2]) < 0.5).all().item())
     c_ok = grounded and not bool(done.any().item())
     ok = ok and c_ok

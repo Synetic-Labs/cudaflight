@@ -46,20 +46,15 @@ void bflStepUs(uint32_t dtUs);
 // Sensor injection. Units and sign conventions are identical to the
 // fdm_packet handling in sitl.c (legacy bridge path):
 //   gyro: rad/s body rates (RPY), acc: m/s^2 NED body frame (1g level
-//   flight is az = -9.80665), quat: body-to-world w,x,y,z.
+//   flight is az = -9.80665).
 void bflSetGyroAccel(double gx, double gy, double gz, double ax, double ay, double az);
 void bflSetBaro(int32_t pressurePa);
-void bflSetAttitudeQuat(float w, float x, float y, float z);
 
 // RC injection (1000..2000 us channel values, AETR order by default map).
 void bflSetRc(const uint16_t *channels, uint8_t channelCount);
 
-// Differentiable RC injection: float channel values written straight into
-// rcData, bypassing the uint16 quantization (for the autodiff core).
-void bflSetRcFloat(const float *channels, uint8_t channelCount);
-
-// Differentiable rate-control core: real stick->motor pipeline (no scheduler),
-// rcChannelsUs = 4 channels [1000,2000] us AETR. For the Enzyme autodiff path.
+// Rate-control core: real stick->motor pipeline (no scheduler), rcChannelsUs =
+// 4 channels [1000,2000] us AETR. Backs the finite-difference gradient kernels.
 void bflRateCore(const float *rcChannelsUs);
 
 // Raw float mixer output (motor[]), pre int16 quantization — the smooth signal
@@ -81,7 +76,8 @@ void bflDebugStatus(void);
 
 // Motor readback.
 uint16_t bflGetMotorCount(void);
-// Raw PWM values as written by the mixer (typically 1000..2000).
+// Raw PWM values as written by the mixer (typically 1000..2000): motors
+// first, then any servo outputs appended at index bflGetMotorCount().
 void bflGetMotorsPwm(float *out, unsigned maxCount);
 // Normalised [0,1] ([-1,1] in 3D mode) outputs, as sent to simulators.
 void bflGetMotorsNormalised(float *out, unsigned maxCount);
@@ -90,7 +86,8 @@ uint64_t bflGetMotorUpdateCount(void);
 
 // Override the EEPROM backing file path (default: EEPROM_FILENAME).
 // NULL selects RAM-only mode (no file I/O; eepromData is firmware state
-// and therefore per-instance). Must be called before init.
+// and therefore per-instance). Must be called before init. The pointer is
+// retained, not copied — it must outlive all EEPROM access.
 void bflSetEepromPath(const char *path);
 
 // Direct access to the EEPROM backing store of the active instance, for
@@ -101,9 +98,10 @@ uint32_t bflEepromSize(void);
 // Execute CLI commands against the active instance through the real CLI
 // parser (the code path a configurator paste takes); output is captured
 // and printed with a [cli] prefix. The text must not contain reboot-class
-// commands ('save' without noreboot, 'exit', plain 'defaults', 'bl',
-// 'msc') — systemReset() exits the process on this target. Use the
-// harness-side dump loader for raw configurator/manufacturer dumps.
+// or batch commands ('save', 'exit', 'batch', 'bl', 'msc', 'defaults'
+// without nosave) — systemReset() exits the process on this target.
+// sanitizeCliDump() in sitl_lockstep_main.c strips them from raw
+// configurator/manufacturer dumps.
 void bflCliExec(const char *text, uint32_t len);
 
 // mixerConfig()->yaw_motors_reversed of the active instance, for the

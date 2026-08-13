@@ -59,6 +59,7 @@ clang -O2 -fPIC -ffunction-sections -fdata-sections -c "$OUT/fw_final.bc" -o "$O
 
 echo "== linking"
 linkcmd=$(grep -E '^clang -o obj/main/betaflight_SITL_LOCKSTEP\.elf' "$OUT/cmds.txt" | head -1)
+[ -n "$linkcmd" ] || { echo "link-command harvest from $OUT/cmds.txt failed"; exit 1; }
 flags=$(sed -E 's|^clang -o [^ ]+ ||; s|obj/main/SITL_LOCKSTEP/[^ ]+\.o ?||g' <<<"$linkcmd")
 clang -o "$OUT/betaflight_SITL_LOCKSTEP_MULTI" \
     "$OUT/fw_inst.o" \

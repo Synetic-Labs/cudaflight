@@ -61,7 +61,6 @@ typedef struct {
     uint16_t rc[BFL_MAX_RC_CHANNELS];
     uint64_t hash;
     uint32_t ms;            // absolute control step count
-    uint32_t episodeSteps;  // bfStep calls since boot/reset
     uint8_t perturbed;
     uint8_t airborne;       // has left the ground this episode
     uint64_t blobBase;      // address this instance's blob pointers are based at
@@ -173,10 +172,10 @@ KERNEL void bfLoadEeprom(const uint8_t *src, uint64_t len, uint32_t perInstance)
     }
     uint8_t *ee = bflEepromBuffer();
     const uint32_t cap = bflEepromSize();
-    if (len > cap) {
-        len = cap;
-    }
-    memcpy(ee, src + (perInstance ? (uint64_t)k * len : 0), len);
+    // len is the source stride; clamp only the copy size or per-instance
+    // images larger than the EEPROM would be strided wrong.
+    const uint64_t copyLen = len > cap ? cap : len;
+    memcpy(ee, src + (perInstance ? (uint64_t)k * len : 0), copyLen);
 }
 
 // Boot the instance through the real firmware init path.
@@ -278,7 +277,7 @@ KERNEL void bfSnapshot(bfFlight_t *st, bfFlight_t *snapSt, char *snapBase)
 
 // Restore flagged instances to their snapshot. Pure memcpy — no pointer
 // rebasing needed since source and destination are the same blob — so an
-// RL episode reset costs ~56KB of bandwidth per instance. Restored
+// RL episode reset costs one image-sized memcpy per instance. Restored
 // instances replay bit-identically given identical inputs.
 KERNEL void bfReset(bfFlight_t *st, bfFlight_t *snapSt, char *snapBase, const uint8_t *flags)
 {
@@ -327,7 +326,6 @@ KERNEL void bfStep(bfFlight_t *st, const float *actions, float *obs,
     for (uint32_t n = 0; n < decimation; n++) {
         controlStep(s);
     }
-    s->episodeSteps++;
 
     const float alt = (float)quadSimAltitude(&s->sim);
     if (alt > 0.3f) {
@@ -376,8 +374,8 @@ KERNEL void bfStep(bfFlight_t *st, const float *actions, float *obs,
 // the determinism oracle covers this path too.
 //
 // actions: [N x 4] in [-1,1], AETR -> RC, same stick mapping as bfStep.
-// sensors: [N x 7]: body rates rad/s NED (3), specific force m/s^2 NED
-//          body (3), baro pressure Pa (1).
+// sensors: [N x 7]: body-frame (FRD) rates rad/s (3), specific force
+//          m/s^2 (3), baro pressure Pa (1).
 // motors:  [N x 4] normalised [0,1] outputs for the external model.
 KERNEL void bfFwStep(bfFlight_t *st, const float *actions, const float *sensors,
                      float *motors, uint8_t *armed, uint32_t substeps)
@@ -407,7 +405,6 @@ KERNEL void bfFwStep(bfFlight_t *st, const float *actions, const float *sensors,
         bflGetMotorsPwm(m, 4);
         s->hash = fnv1a64(s->hash, m, sizeof(m));
     }
-    s->episodeSteps++;
 
     bflGetMotorsNormalised(&motors[(uint64_t)k * 4], 4);
     armed[k] = bflIsArmed() ? 1 : 0;
@@ -440,7 +437,7 @@ KERNEL void bfSetAux(bfFlight_t *st, const float *aux)
 // the firmware blob as a donated JAX buffer whose address XLA chooses, so the
 // global base must point at it before any firmware access. Launched 1-thread,
 // stream-ordered ahead of bfFwStep/bfReset; rebase-on-entry (bfRebaseSelf) then
-// fixes the 212 self-pointers for that address on the step that follows.
+// fixes the self-pointers for that address on the step that follows.
 KERNEL void bfSetBase(char *base)
 {
     if (self() == 0) {
@@ -476,12 +473,8 @@ KERNEL void bfRateEval(const float *actions, float *motorsOut)
 // (the same memcpy bfReset uses) so every difference starts from the current
 // frozen state — giving a clean within-step Jacobian J[i][d] = d(motor_i)/
 // d(action_d). It then returns the VJP dActions = J^T · seedMotors.
-//
-// actions:     [N x 4] in [-1,1], AETR (same stick mapping as bfFwStep).
-// seedMotors:  [N x 4] cotangent d(loss)/d(motor).
-// dActions:    [N x 4] output, d(loss)/d(action).
-// scratch:     [N x stride] device scratch for the per-instance blob save.
-// eps:         action-space perturbation (e.g. 1e-3).
+// ===========================================================================
+
 // Central-difference Jacobian of bflRateCore for one instance: on return
 // jac[i][d] = d(motor_i)/d(action_d). `blob` is this instance's image base, `sc`
 // its [stride] scratch slot. The blob is frozen into `sc` once, then restored
@@ -491,11 +484,9 @@ static inline void bfRateJacobianFD(char *blob, char *sc, const float *a,
                                     float eps, float jac[4][4], int onlyCol)
 {
     // onlyCol < 0 -> full 4x4 Jacobian (all action columns). onlyCol in [0,3] ->
-    // only that action column is finite-differenced (the rest are left zero). The
-    // hybrid backend needs only the throttle column from FD (the smooth attitude
-    // columns come from exact forward-mode Enzyme), so a single column saves 3 of
-    // the 4 central-difference sweeps — each sweep being two full control-law
-    // evaluations plus a blob save/restore.
+    // only that action column is finite-differenced (the rest are left zero),
+    // saving 3 of the 4 central-difference sweeps — each sweep being two full
+    // control-law evaluations plus a blob save/restore.
     for (int i = 0; i < 4; i++) {
         for (int d = 0; d < 4; d++) {
             jac[i][d] = 0.0f;
@@ -528,6 +519,11 @@ static inline void bfRateJacobianFD(char *blob, char *sc, const float *a,
     }
 }
 
+// actions:     [N x 4] in [-1,1], AETR (same stick mapping as bfFwStep).
+// seedMotors:  [N x 4] cotangent d(loss)/d(motor).
+// dActions:    [N x 4] output, d(loss)/d(action).
+// scratch:     [N x stride] device scratch for the per-instance blob save.
+// eps:         action-space perturbation (e.g. 1e-3).
 KERNEL void bfFwStepGradFD(const float *actions, const float *seedMotors,
                            float *dActions, char *scratch, float eps)
 {
@@ -581,7 +577,7 @@ KERNEL void bfFwStepJacFD(const float *actions, float *jacOut, char *scratch, fl
 // Rebase-aware twin of bfFwStepJacFD for the value-threaded ("pure") path. There
 // the firmware blob is a donated JAX buffer whose address XLA chooses and whose
 // self-pointers may be stale (a fresh snapshot copy, or post masked-reset), so
-// the Jacobian must rebase-on-entry like bfFwStepPure before touching bflRateCore
+// the Jacobian must rebase-on-entry like bfFwStep before touching bflRateCore
 // — otherwise it follows stale pointers into garbage. The rebase is unconditional
 // (no bfFlight_t to gate on); it leaves the blob correctly based, so the bfFwStep
 // that follows in the same custom_vjp forward rebases at most once more (idempotent).
@@ -599,8 +595,6 @@ KERNEL void bfFwStepJacFDPure(const float *actions, float *jacOut, char *scratch
     char *sc = scratch + (uint64_t)k * __bf_inst_stride;
     const float *a = &actions[(uint64_t)k * BF_ACT_DIM];
 
-    // col < 0 -> full Jacobian; col in [0,3] -> only that action column (the
-    // hybrid backend passes col=3 for the throttle column only).
     float jac[4][4];
     bfRateJacobianFD(blob, sc, a, eps, jac, col);
 
@@ -616,9 +610,11 @@ KERNEL void bfFwStepJacFDPure(const float *actions, float *jacOut, char *scratch
 // attributes: severity + blink) into [N x rows*cols] host-visible
 // buffers. Pure readback — the firmware draws during its own OSD task
 // inside bflStepUs; this kernel just snapshots the grids for a renderer.
-#define BF_OSD_CELLS (16 * 30)
-const uint64_t __bf_osd_rows = 16;
-const uint64_t __bf_osd_cols = 30;
+#define BF_OSD_ROWS 16
+#define BF_OSD_COLS 30
+#define BF_OSD_CELLS (BF_OSD_ROWS * BF_OSD_COLS)
+const uint64_t __bf_osd_rows = BF_OSD_ROWS;
+const uint64_t __bf_osd_cols = BF_OSD_COLS;
 
 KERNEL void bfOsdSnapshot(uint8_t *screens, uint8_t *attrs)
 {

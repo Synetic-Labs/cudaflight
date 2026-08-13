@@ -20,12 +20,6 @@
 
 // See sitl_lockstep_instance.h. This file is harness-side: it is always
 // compiled natively and never goes through the IR instancer.
-//
-// The instancer packs all mutable firmware state into one template image
-// (@__bf_image) and emits layout tables alongside it; instancing is then
-// just "copy the template, rebase the listed pointer slots, point
-// __bf_delta at the copy". No ELF parsing, no linker script — the same
-// tables drive the GPU runtime.
 
 #include <stdint.h>
 #include <stdio.h>
@@ -98,10 +92,16 @@ int bflInstancesCreate(unsigned count)
     const size_t stride = (size + align - 1) & ~(align - 1);
 
     blobs = calloc(count, sizeof(*blobs));
+    if (!blobs) {
+        fprintf(stderr, "[instance] allocation failed for %u instances\n", count);
+        return -1;
+    }
     for (unsigned i = 0; i < count; i++) {
         char *blob = aligned_alloc(align, stride);
         if (!blob) {
             fprintf(stderr, "[instance] allocation failed for instance %u\n", i);
+            blobCount = i;    // so bflInstancesDestroy can free the partial set
+            bflInstancesDestroy();
             return -1;
         }
         // pristine template copy + pointer rebasing into this copy

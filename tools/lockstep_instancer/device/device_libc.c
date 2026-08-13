@@ -141,8 +141,6 @@ static int lowerc(int c)
     return (c >= 'A' && c <= 'Z') ? c + 32 : c;
 }
 
-
-
 char *strchr(const char *s, int c)
 {
     for (;; s++) {
@@ -219,7 +217,6 @@ char *strsep(char **sp, const char *delim)
     if (*end) { *end = 0; *sp = end + 1; } else { *sp = 0; }
     return s;
 }
-
 
 char *strerror(int e)
 {

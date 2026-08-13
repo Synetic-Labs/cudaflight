@@ -1,26 +1,30 @@
-"""Oracle tests for BetaflightJaxEnv — same suite as test_cudaflight.py (torch),
+"""Oracle tests for BetaflightJaxEnv — same suite as test_torch_env.py,
 driven through JAX arrays:
 
   A  determinism: fixed action sequence replays bit-exactly across reset
   B  closed-loop hover: a jnp P-controller holds 5m through step() alone
   C  crash + auto-reset: throttle cut raises dones, auto-reset restores
 
-Run: .venv/bin/python test_jax_env.py [num_envs]
+Run: python test_jax_env.py [num_envs]
 """
 
 import sys
 import time
 
+# importing jnp through the env module keeps the XLA preallocation
+# env var set before jax first touches the GPU
 from cudaflight.jax_env import BetaflightJaxEnv, jnp
 
+import jax
 
-def main():
+
+def main() -> None:
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 256
     print(f"[cudaflight-jax] creating {n} instances (boot + settle + arm + snapshot)...")
     t0 = time.time()
     env = BetaflightJaxEnv(n, auto_reset=False)
     print(f"[cudaflight-jax] created in {time.time() - t0:.1f}s: "
-          f"jax {__import__('jax').__version__}, device {env.device}")
+          f"jax {jax.__version__}, device {env.device}")
     ok = True
 
     zeros = jnp.zeros((n, env.act_dim), jnp.float32)
@@ -45,7 +49,7 @@ def main():
     actions = throttle(0.6)  # initial climb
     t0 = time.time()
     for _ in range(1000):  # 10s sim at decimation 10
-        obs, rew, done = env.step(actions)
+        obs, _, done = env.step(actions)
         alt = -obs[:, 2]
         vz_up = -obs[:, 5]
         actions = zeros.at[:, 2].set(jnp.clip(0.36 + 0.22 * (5.0 - alt) - 0.12 * vz_up, -1, 1))
@@ -65,13 +69,13 @@ def main():
     actions = throttle(-1.0)
     crashed = False
     for i in range(300):
-        obs, rew, done = env.step(actions)
+        obs, _, done = env.step(actions)
         if bool(done.all()):
             crashed = True
             break
     print(f"[cudaflight-jax] C crash: all done after {i + 1} steps: {'yes' if crashed else 'NO'}")
     ok = ok and crashed
-    obs, rew, done = env.step(throttle(0.36))
+    obs, _, done = env.step(throttle(0.36))
     grounded = bool(((-obs[:, 2]) < 0.5).all())
     c_ok = grounded and not bool(done.any())
     ok = ok and c_ok

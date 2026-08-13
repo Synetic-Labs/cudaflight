@@ -25,19 +25,20 @@ def _packaged_font() -> Path:
         return Path(p)
 
 
-FONT_C = _packaged_font()
-
 GLYPH_W, GLYPH_H = 12, 18
 GLYPHS = 256
 
 # pixel classes in the index image
 _PX_TRANSPARENT, _PX_BLACK, _PX_WHITE, _PX_BORDER = 0, 1, 2, 3
 
+_GLYPH_SPACE = 0x20
 
-def load_font_atlas(path=None):
+
+def load_font_atlas(path: "str | Path | None" = None) -> np.ndarray:
     """Parse the firmware's font table into a [256, 18, 12] uint8 array
     of pixel classes (0 transparent, 1 black, 2 white)."""
-    text = Path(path or FONT_C).read_text()
+    font = Path(path) if path else _packaged_font()
+    text = font.read_text()
     tokens = re.findall(r"0b([01]{8})", text)
     data = np.array([int(t, 2) for t in tokens], dtype=np.uint8)
     expected = GLYPHS * GLYPH_H * 3  # 3 bytes per 12px row, 2bpp
@@ -60,8 +61,10 @@ def load_font_atlas(path=None):
 class OsdWall:
     """Tile K OSD character grids into one RGB mosaic on the GPU."""
 
-    def __init__(self, device, rows=16, cols=30, gap=2,
-                 bg=(24, 28, 24), border=(70, 74, 70), font_path=None):
+    def __init__(self, device: torch.device, rows: int = 16, cols: int = 30,
+                 gap: int = 2, bg: "tuple[int, int, int]" = (24, 28, 24),
+                 border: "tuple[int, int, int]" = (70, 74, 70),
+                 font_path: "str | Path | None" = None) -> None:
         self.device = device
         self.rows, self.cols = rows, cols
         self.gap = gap
@@ -74,7 +77,9 @@ class OsdWall:
         self.tile_h = rows * GLYPH_H + 2 * gap
         self.tile_w = cols * GLYPH_W + 2 * gap
 
-    def mosaic(self, osd, attrs=None, grid=None, blink_phase=False):
+    def mosaic(self, osd: torch.Tensor, attrs: "torch.Tensor | None" = None,
+               grid: "tuple[int, int] | None" = None,
+               blink_phase: bool = False) -> torch.Tensor:
         """osd: [K, rows, cols] uint8 CUDA tensor of font indices.
         attrs: optional matching attribute grids (bit 7 = blink).
         grid: (tiles_y, tiles_x), default a near-square layout.
@@ -89,7 +94,7 @@ class OsdWall:
 
         osd = osd.long()
         if attrs is not None and blink_phase:
-            osd = torch.where(attrs & 0x80 != 0, 0x20, osd)
+            osd = torch.where(attrs & 0x80 != 0, _GLYPH_SPACE, osd)
 
         glyphs = self.atlas[osd]                              # [K, R, C, 18, 12]
         tiles = glyphs.permute(0, 1, 3, 2, 4).reshape(
@@ -104,7 +109,9 @@ class OsdWall:
                     .reshape(ty * self.tile_h, tx * self.tile_w))
         return self.lut[idx.long()]                           # [H, W, 3]
 
-    def frame(self, osd, attrs=None, grid=None, blink_phase=False, scale=1.0):
+    def frame(self, osd: torch.Tensor, attrs: "torch.Tensor | None" = None,
+              grid: "tuple[int, int] | None" = None, blink_phase: bool = False,
+              scale: float = 1.0) -> torch.Tensor:
         """mosaic() plus optional area-resampling to scale, as HWC uint8."""
         img = self.mosaic(osd, attrs, grid, blink_phase)
         if scale != 1.0:

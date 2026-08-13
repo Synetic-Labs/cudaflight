@@ -6,7 +6,8 @@
 // harness: every unperturbed instance must produce a bit-identical
 // motor-output hash, a perturbed one must diverge without affecting the
 // others. Exit codes match sitl_lockstep_main.c (2 arm fail, 3 not
-// armed/airborne, 4 hash mismatch / no divergence).
+// armed/airborne, 4 hash mismatch / no divergence), plus 5 (--test-reset
+// fail) and 6 (--test-step fail).
 
 #include <cuda.h>
 
@@ -80,7 +81,7 @@ int main(int argc, char **argv)
             testStep = true;
         } else {
             fprintf(stderr,
-                    "usage: %s [--instances N] [--perturb K] [--seconds N] [--chunk MS] [--module FILE] [--eeprom FILE] [--test-reset]\n",
+                    "usage: %s [--instances N] [--perturb K] [--seconds N] [--chunk MS] [--module FILE] [--eeprom FILE] [--test-reset] [--test-step]\n",
                     argv[0]);
             return 1;
         }
@@ -92,7 +93,11 @@ int main(int argc, char **argv)
     char name[128] = {0};
     cuDeviceGetName(name, sizeof(name), dev);
     CUcontext ctx;
+#if CUDA_VERSION >= 13000
+    CU(cuCtxCreate(&ctx, NULL, 0, dev)); // 13.x: cuCtxCreate is the 4-arg _v4
+#else
     CU(cuCtxCreate(&ctx, 0, dev));
+#endif
     // The whole firmware runs on one thread's stack. The driver reserves
     // stack for the device-wide max resident thread count (~260k on a
     // 5090), so this can't be extravagant: 32 KB ≈ 8 GB reserved.
@@ -175,6 +180,7 @@ int main(int argc, char **argv)
         std::vector<uint8_t> ee(eeLen);
         if (fread(ee.data(), 1, eeLen, f) != eeLen) {
             fprintf(stderr, "[gpu] failed to read '%s'\n", eepromPath);
+            fclose(f);
             return 1;
         }
         fclose(f);
