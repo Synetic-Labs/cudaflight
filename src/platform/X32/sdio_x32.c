@@ -196,8 +196,13 @@ void SDMMC_port_config(void)
         IOConfigGPIOAF(d3, IOCFG_SDMMC, sdioPin[SDIO_PIN_D3].af);
     }
 
-    // HAL_NVIC_SetPriority(sdioHardware->irqn, NVIC_PRIORITY_BASE(NVIC_PRIO_SDIO_DMA), NVIC_PRIORITY_SUB(NVIC_PRIO_SDIO_DMA));
-    // HAL_NVIC_EnableIRQ(sdioHardware->irqn);
+    // Enable SDMMC interrupt in NVIC
+    NVIC_InitType nvicInit;
+    nvicInit.NVIC_IRQChannel = sdioHardware->irqn;
+    nvicInit.NVIC_IRQChannelPreemptionPriority = NVIC_PRIORITY_BASE(NVIC_PRIO_SDIO_DMA);
+    nvicInit.NVIC_IRQChannelSubPriority = NVIC_PRIORITY_SUB(NVIC_PRIO_SDIO_DMA);
+    nvicInit.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&nvicInit);
 }
 
 void sdioInitialize(void)
@@ -260,9 +265,15 @@ bool SD_IsDetected(void)
 
 bool SD_GetState(void)
 {
-    Status_card cardState = SD_PollingCardStatusBusy(&card,1000);
 
-    // return (cardState == Status_CardStatusBusy);
+
+    // Phase 1: Hardware DAT0 check (microseconds)
+    if (SDMMC_GetPresentFlagStatus(card.SDHOSTx, SDHOST_Data0LineLevelFlag) != SET) {
+        return false;  // DAT0 low = card definitely busy, no need to send CMD13
+    }
+
+    Status_card cardState = SD_PollingCardStatusBusy(&card, 1);
+
     return (cardState == Status_CardStatusIdle);
 }
 
@@ -315,6 +326,58 @@ static void SDMMC_Config(void)
 }
 
 
+/* Number of polls to wait for the CMD line to go idle after a command. The identification
+ * sequence runs at 400kHz, where a 48-bit response takes ~120us, so this is generous.
+ */
+#define SD_CMD_IDLE_TIMEOUT 100000
+
+/**
+ * Issue a command, working around a race in SDMMC_WaitCommandDone().
+ *
+ * That function returns as soon as it sees any bit of SDHOST_CommandFlag, clears it, and
+ * then reads the response registers unconditionally. A command interrupt left over from the
+ * previous command therefore makes it report success for a command that is still in flight
+ * and hand back an empty response - which is what CMD8 hits, arriving immediately after
+ * CMD0. The caller then rejects a perfectly good card because the check pattern reads zero.
+ *
+ * Clearing the command flags before issuing removes the stale flag, and waiting for
+ * SDHOST_PRESTS_CMDINHC afterwards guarantees the response has actually landed.
+ */
+static Status_card sdSendCommand(sd_card_t *card, uint32_t index, uint32_t argument, SDMMC_CardRspType responseType)
+{
+    SDMMC_ClrFlag(card->SDHOSTx, (uint32_t)SDHOST_CommandFlag);
+
+    const Status_card status = SD_NormalCMD_Send(card, index, argument, responseType);
+
+    if (status != Status_Success) {
+        return status;
+    }
+
+    bool cmdLineIdle = false;
+
+    for (uint32_t spins = 0; spins < SD_CMD_IDLE_TIMEOUT; spins++) {
+        if ((card->SDHOSTx->PRESTS & SDHOST_PRESTS_CMDINHC) == 0) {
+            cmdLineIdle = true;
+            break;
+        }
+    }
+
+    if (!cmdLineIdle) {
+        // The command never released the CMD line, so nothing can be trusted about it -
+        // including the success SDMMC_WaitCommandDone() reported.
+        return Status_Fail;
+    }
+
+    // Pick up a response that landed after SDMMC_WaitCommandDone() had already sampled the
+    // registers. Only R2 needs the multi-word unpacking, which it has already done.
+    if ((responseType != CARD_ResponseTypeNone) && (responseType != CARD_ResponseTypeR2)
+            && (card->command.response[0] == 0)) {
+        card->command.response[0] = card->SDHOSTx->CMDRSP0;
+    }
+
+    return status;
+}
+
 /**
  *\*\name   SD_DefaultSpeedModeInit.
  *\*\fun    Configure to communicate in Default Speed mode.
@@ -366,7 +429,7 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
     
     /* enable all status signal */
     SDMMC_EnableFlagStatus(card->SDHOSTx,SDHOST_AllInterruptFlags,ENABLE);
-    
+
     /* Change the detection of SD card CD pin to TEST mode, default to high */
     SDMMC_ConfigCardDetectSignal(card->SDHOSTx,SDMMC_CARDDETECT_TEST,SDMMC_CARDTESTLEVEL_HIGH);
     
@@ -394,6 +457,13 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
     
     /* Enable SD card power and clock */
     SDMMC_EnablePower(card->SDHOSTx,ENABLE);
+
+    /* The SD physical layer spec requires at least 1ms after VDD is stable before the host
+     * may start the identification sequence. Without this the card is still powering up when
+     * CMD0 goes out and it never answers CMD8.
+     */
+    SDMMC_Delay(2);
+
     if(((SD_XIN_CLK % 400000U) != 0)  || ((SD_XIN_CLK/400000U)%2 != 0))
     {
         if(SD_XIN_CLK <= card->card_workmode.busClock_Hz)
@@ -410,19 +480,29 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
         persacle_value = SD_XIN_CLK/400000U/2;
     }
     
-    SDMMC_SetSdClock(card->SDHOSTx,DISABLE,persacle_value);  //100MHz/250 = 400KHz
-     
+    /* SDMMC_SetSdClock() reports whether the clock actually went stable; ignoring it means a
+     * dead clock only shows up later as an unexplained command timeout.
+     */
+    if (SDMMC_SetSdClock(card->SDHOSTx,DISABLE,persacle_value) != SDMMC_SUCCESS) {  //100MHz/250 = 400KHz
+        return Status_Fail;
+    }
+
+    /* The card needs at least 74 clock cycles with CMD high before it will respond, which is
+     * ~185us at 400kHz.
+     */
+    SDMMC_Delay(1);
+
     /** A series of commands begins to begin the card identification process. **/
     
     /* CMD0 */
-    if(SD_NormalCMD_Send(card,SDMMC_GoIdleState,0x00,CARD_ResponseTypeNone) != Status_Success)
+    if(sdSendCommand(card,SDMMC_GoIdleState,0x00,CARD_ResponseTypeNone) != Status_Success)
     {
         return Status_Fail;
     }
     
     /* CMD8 */
     //arg[19:16] = 0001b 2.7V~3.6V,arg[15:8] = 0xAA check pattern
-    if(SD_NormalCMD_Send(card,SD_SendInterfaceCondition,0x1AAU,CARD_ResponseTypeR7) != Status_Success)
+    if(sdSendCommand(card,SD_SendInterfaceCondition,0x1AAU,CARD_ResponseTypeR7) != Status_Success)
     {
         return Status_Fail;
     }
@@ -504,7 +584,7 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
     
     
     /* CMD2 */
-    if(SD_NormalCMD_Send(card,SDMMC_AllSendCid,0x00,CARD_ResponseTypeR2) != Status_Success)
+    if(sdSendCommand(card,SDMMC_AllSendCid,0x00,CARD_ResponseTypeR2) != Status_Success)
     {
         return Status_Fail;
     }
@@ -517,7 +597,7 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
     
     
     /* CMD3 */
-    if(SD_NormalCMD_Send(card,SD_SendRelativeAddress,0x00,CARD_ResponseTypeR6) != Status_Success)
+    if(sdSendCommand(card,SD_SendRelativeAddress,0x00,CARD_ResponseTypeR6) != Status_Success)
     {
         return Status_Fail;
     }
@@ -525,7 +605,7 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
     
     
     /* CMD9 */
-    if(SD_NormalCMD_Send(card,SDMMC_SendCsd,card->sd_card_information.rca << 16,CARD_ResponseTypeR2) != Status_Success)
+    if(sdSendCommand(card,SDMMC_SendCsd,card->sd_card_information.rca << 16,CARD_ResponseTypeR2) != Status_Success)
     {
         return Status_Fail;
     }
@@ -537,7 +617,7 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
     SD_Handle.CSD[3] = card->command.response[0U];
     
     /* CMD7 */
-    if(SD_NormalCMD_Send(card,SDMMC_SelectCard,card->sd_card_information.rca << 16,CARD_ResponseTypeR1b) != Status_Success)
+    if(sdSendCommand(card,SDMMC_SelectCard,card->sd_card_information.rca << 16,CARD_ResponseTypeR1b) != Status_Success)
     {
         return Status_Fail;
     }
@@ -555,7 +635,7 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
     }
     
     /* CMD16 */
-    if(SD_NormalCMD_Send(card,SDMMC_SetBlockLength,FSL_SDMMC_DEFAULT_BLOCK_SIZE,CARD_ResponseTypeR1) != Status_Success)
+    if(sdSendCommand(card,SDMMC_SetBlockLength,FSL_SDMMC_DEFAULT_BLOCK_SIZE,CARD_ResponseTypeR1) != Status_Success)
     {
         return Status_Fail;
     }
@@ -605,11 +685,16 @@ static Status_card SD_PowerOnInit(sd_card_t* card)
     {
         persacle_value = SD_XIN_CLK/card->card_workmode.busClock_Hz/2;
     }
-    SDMMC_SetSdClock(card->SDHOSTx,DISABLE,persacle_value);
-     
+    /* Switching to the working clock can fail the same way as the 400kHz setup above;
+     * continuing would leave the card configured for a clock that is not running.
+     */
+    if (SDMMC_SetSdClock(card->SDHOSTx,DISABLE,persacle_value) != SDMMC_SUCCESS) {
+        return Status_Fail;
+    }
+
     /* This function is not necessary. Depending on the hardware and card, 
        you can decide whether to enable TX CLK delay and how much delay to use */
-    // SDMMC_EnableManualTuningOut(SDMMC1,8,ENABLE);
+    SDMMC_EnableManualTuningOut(card->SDMMCx,8,ENABLE);
     
     return status_temp;
 }
@@ -645,8 +730,8 @@ static SD_Error_t SD_DoInit(void)
         card.card_workmode.busWidth = SDMMC_BusWdith1Bit; // FIXME untested
     }
 
-    card.card_workmode.mode = SDMMC_DS; 
-    card.card_workmode.busClock_Hz = 25000000;
+    card.card_workmode.mode = SDMMC_HS; 
+    card.card_workmode.busClock_Hz = 50000000;
     card.card_workmode.dma = SDMMC_SDMA;
     card.card_workmode.operationVoltageflag = SD_OperationVoltage330V;
     SDMMC_TModeStructInit(&card.TMODE_truct);
@@ -879,6 +964,9 @@ SD_Error_t SD_Init(void)
     static SD_Error_t result = SD_ERROR;
 
     if (sdInitAttempted) {
+        if (result == SD_OK) {
+            return SD_GetState() ? SD_OK : SD_ERROR;
+        }
         return result;
     }
 
@@ -931,28 +1019,24 @@ SD_Error_t SD_GetCardStatus(SD_CardStatus_t *pCardStatus)
 SD_Error_t SD_WriteBlocks_DMA(uint64_t WriteAddress, uint32_t *buffer, uint32_t BlockSize, uint32_t NumberOfBlocks)
 {
     SD_Error_t ErrorState = SD_OK;
-    SD_Handle.TXCplt = 1;
 
     if (BlockSize != 512) {
         return SD_ERROR; // unsupported.
     }
 
-    // if ((uint32_t)buffer & 0x1f) {
-    //     return SD_ADDR_MISALIGNED;
-    // }
 #ifdef __DCACHE_PRESENT
-    // Ensure the data is flushed to main memory
+    // Ensure the data is flushed to main memory before SDMA reads it
     X32_CLEAN_DCACHE_BY_ADDR(buffer, NumberOfBlocks * BlockSize);
 #endif
-    Status_card status;
+
+    SD_Handle.TXCplt = 1;
 
     card.card_workmode.dma = SDMMC_SDMA;
 
-    if ((status = SD_WriteBlocks(&card, buffer, (uint32_t)WriteAddress, NumberOfBlocks)) != Status_Success) {
-        ErrorState = SD_ERROR;
+    if (SD_WriteBlocks_IT(&card, buffer, (uint32_t)WriteAddress, NumberOfBlocks) != Status_Success) {
+        SD_Handle.TXCplt = 0;
+        return SD_ERROR;
     }
-
-    SD_Handle.TXCplt = 0;
 
     return ErrorState;
 }
@@ -973,39 +1057,66 @@ SD_Error_t SD_ReadBlocks_DMA(uint64_t ReadAddress, uint32_t *buffer, uint32_t Bl
         return SD_ERROR; // unsupported.
     }
 
-    // if ((uint32_t)buffer & 0x1f) {
-    //     return SD_ADDR_MISALIGNED;
-    // }
-
     SD_Handle.RXCplt = 1;
 
     sdReadParameters.buffer = buffer;
     sdReadParameters.BlockSize = BlockSize;
     sdReadParameters.NumberOfBlocks = NumberOfBlocks;
 
-    Status_card status;
-
     card.card_workmode.dma = SDMMC_SDMA;
-    if ((status = SD_ReadBlocks(&card, buffer, (uint32_t)ReadAddress, NumberOfBlocks)) != Status_Success) {
-        ErrorState = SD_ERROR;
-    }
 
-    SD_Handle.RXCplt = 0;
-#ifdef __DCACHE_PRESENT
-    X32_INVALIDATE_DCACHE_BY_ADDR(sdReadParameters.buffer, sdReadParameters.NumberOfBlocks * sdReadParameters.BlockSize);
-#endif
+    if (SD_ReadBlocks_IT(&card, buffer, (uint32_t)ReadAddress, NumberOfBlocks) != Status_Success) {
+        SD_Handle.RXCplt = 0;
+        return SD_ERROR;
+    }
 
     return ErrorState;
 }
 
 void SDMMC1_IRQHandler(void)
 {
-    // HAL_SD_IRQHandler(&card);
+    SD_IRQHandler(&card);
+
+    /* Handle transfer completion */
+    if (card.transferState == 2) {
+        if (SD_Handle.RXCplt) {
+            /* Read complete - invalidate D-cache to ensure CPU reads correct data */
+#ifdef __DCACHE_PRESENT
+            uint32_t alignedAddr = (uint32_t)sdReadParameters.buffer & ~0x1F;
+            X32_INVALIDATE_DCACHE_BY_ADDR(
+                (uint32_t*)alignedAddr,
+                sdReadParameters.NumberOfBlocks * sdReadParameters.BlockSize
+                    + ((uint32_t)sdReadParameters.buffer - alignedAddr));
+#endif
+            SD_Handle.RXCplt = 0;
+        }
+
+        if (SD_Handle.TXCplt) {
+            SD_Handle.TXCplt = 0;
+        }
+
+        /* transferState is consumed by blocking SD_ReadBlocks/SD_WriteBlocks
+           in sdmmc_host.c which reset it to 0 after detecting completion.
+           For IT (non-blocking) path, upper layer uses RXCplt/TXCplt flags. */
+    }
+
+    /* Handle transfer error */
+    if (card.transferState == 3) {
+        if (SD_Handle.RXCplt) {
+            SD_Handle.RXErrors++;
+            SD_Handle.RXCplt = 0;
+        }
+
+        if (SD_Handle.TXCplt) {
+            SD_Handle.TXErrors++;
+            SD_Handle.TXCplt = 0;
+        }
+    }
 }
 
 void SDMMC2_IRQHandler(void)
 {
-    // HAL_SD_IRQHandler(&card);
+    SDMMC1_IRQHandler();
 }
 
 #endif

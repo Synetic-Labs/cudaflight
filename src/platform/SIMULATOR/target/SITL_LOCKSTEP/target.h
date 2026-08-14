@@ -44,6 +44,12 @@
 #define USE_DYN_NOTCH_FILTER
 #define SIMULATOR_DYN_NOTCH
 
+// Upstream slows the virtual gyro to 1 kHz because a wall-clock SITL only
+// re-reads stale simulator data at 8 kHz. Lockstep time is virtual, so
+// sampling costs nothing — keep the pre-2026.6 8 kHz real-sensor default
+// so the PID loop rate and filter discretization match hardware.
+#define VIRTUAL_GYRO_SAMPLE_RATE_HZ 8000
+
 // OSD, rendered by the firmware into a per-instance character grid via
 // the framebuffer-OSD displayport (io/displayport_fb_osd.c); the
 // fb_osd_impl backend is sitl_lockstep_osd.c. SD only: with USE_OSD_HD
