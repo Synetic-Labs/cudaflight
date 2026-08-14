@@ -28,7 +28,7 @@ PYTHON     ?= python3
 # it is a 14MB arch-locked binary regenerated on every firmware build). Keep
 # VERSION in sync with pyproject.toml; the tag is namespaced (cudaflight-v*) so it
 # does not collide with the firmware-version release tags.
-VERSION    ?= 0.3.0
+VERSION    ?= 0.3.1
 REPO       ?= synaptech-solutions/cudaflight
 TAG        := cudaflight-v$(VERSION)
 WHEEL      := dist/cudaflight-$(VERSION)-py3-none-linux_x86_64.whl

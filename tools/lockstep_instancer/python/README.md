@@ -30,9 +30,9 @@ ARCHS="sm_80 sm_89 sm_90 sm_120" \
 From a local build:
 
 ```bash
-pip install dist/cudaflight-0.3.0-py3-none-linux_x86_64.whl
+pip install dist/cudaflight-0.3.1-py3-none-linux_x86_64.whl
 # or with extras:
-pip install "cudaflight[jax] @ file:///abs/path/to/dist/cudaflight-0.3.0-py3-none-linux_x86_64.whl"
+pip install "cudaflight[jax] @ file:///abs/path/to/dist/cudaflight-0.3.1-py3-none-linux_x86_64.whl"
 ```
 
 The wheel is tagged `py3-none-linux_x86_64`: ABI-agnostic (no CPython
@@ -52,7 +52,7 @@ This creates (or re-uploads to) the `cudaflight-v<version>` release on
 `synaptech-solutions/cudaflight`. Install directly from the asset URL:
 
 ```bash
-pip install https://github.com/synaptech-solutions/cudaflight/releases/download/cudaflight-v0.3.0/cudaflight-0.3.0-py3-none-linux_x86_64.whl
+pip install https://github.com/synaptech-solutions/cudaflight/releases/download/cudaflight-v0.3.1/cudaflight-0.3.1-py3-none-linux_x86_64.whl
 ```
 
 Or pin it as a dependency (works with pip and uv):
@@ -60,7 +60,7 @@ Or pin it as a dependency (works with pip and uv):
 ```toml
 # pyproject.toml of the consuming project
 dependencies = [
-  "cudaflight @ https://github.com/synaptech-solutions/cudaflight/releases/download/cudaflight-v0.3.0/cudaflight-0.3.0-py3-none-linux_x86_64.whl",
+  "cudaflight @ https://github.com/synaptech-solutions/cudaflight/releases/download/cudaflight-v0.3.1/cudaflight-0.3.1-py3-none-linux_x86_64.whl",
 ]
 ```
 
