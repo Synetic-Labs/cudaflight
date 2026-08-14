@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Zero-copy PyTorch interface to the GPU Betaflight fleet.
 
 BetaflightEnv wraps libcudaflight.so: N real firmware instances live in device

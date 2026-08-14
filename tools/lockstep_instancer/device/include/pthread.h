@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 // threads do not exist on the GPU; types only, so headers carrying mutex
 // fields still parse. The lockstep build has no threading on flight paths.

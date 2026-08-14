@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * First-principles quad dynamics — a C port of drone_models' first_principles
  * model (the closed-form ODE crazyflow integrates), so the realtime CPU SITL

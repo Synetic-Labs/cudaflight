@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Minimal device-side libc for the GPU firmware build.
 //
 // Everything the firmware's cold paths (CLI, blackbox-virtual, EEPROM

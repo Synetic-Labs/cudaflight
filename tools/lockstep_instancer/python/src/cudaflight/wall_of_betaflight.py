@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The Wall of Betaflights.
 
 N real Betaflight firmware instances run on the GPU, each drawing its

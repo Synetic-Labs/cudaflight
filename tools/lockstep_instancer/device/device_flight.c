@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // GPU flight harness: device-side mirror of sitl_lockstep_main.c.
 //
 // One thread == one firmware instance. The control schedule (settle,

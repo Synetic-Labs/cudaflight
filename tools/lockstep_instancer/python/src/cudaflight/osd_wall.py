@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """GPU renderer for walls of Betaflight OSDs.
 
 Font: the authentic Betaflight MAX7456 font, parsed straight out of the

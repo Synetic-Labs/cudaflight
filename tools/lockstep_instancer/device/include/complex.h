@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 // C99 complex arithmetic is native in clang on any target; only the
 // macros/functions need declaring.

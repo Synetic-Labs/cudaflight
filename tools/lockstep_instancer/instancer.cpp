@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Betaflight SITL_LOCKSTEP multi-instance IR transform, layout edition.
 //
 // Input: the whole firmware llvm-linked into one module (every TU except

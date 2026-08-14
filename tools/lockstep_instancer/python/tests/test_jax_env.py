@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Oracle tests for BetaflightJaxEnv — same suite as test_torch_env.py,
 driven through JAX arrays:
 

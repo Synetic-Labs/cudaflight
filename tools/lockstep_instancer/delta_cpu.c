@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // CPU definition of the per-instance state offset used by instanced
 // firmware code. Linked (as bitcode) into the firmware module after the
 // instancer pass so the call inlines down to a single load. The global

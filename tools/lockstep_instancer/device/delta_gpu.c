@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // GPU definition of the per-instance state offset used by instanced
 // firmware code. One GPU thread == one firmware instance, everywhere and
 // for the lifetime of the module: every kernel derives the instance

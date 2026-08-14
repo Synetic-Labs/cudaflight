@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // cudaflight: C shared library exposing the GPU Betaflight fleet as an RL
 // environment. cudaflight_create() boots, settles and arms N firmware
 // instances and snapshots them as the episode start state; cudaflight_step()

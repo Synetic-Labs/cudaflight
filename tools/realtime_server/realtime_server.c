@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Real-time pose server for an external renderer client — see README.md.
 //
 // Boots ONE real Betaflight firmware instance + a first-principles rigid body on

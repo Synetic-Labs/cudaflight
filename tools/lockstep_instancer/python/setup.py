@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Setuptools shim for the wheel tag.
 
 The wheel ships prebuilt ``.so``s, ``fw.fatbin`` and the OSD font as

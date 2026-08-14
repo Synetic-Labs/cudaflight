@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """ctypes bindings for libcudaflight.so / libcpuflight.so and artifact resolution.
 
 The packaged wheel ships its own ``libcudaflight.so``, ``fw.fatbin`` and

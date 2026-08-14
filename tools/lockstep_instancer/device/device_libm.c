@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Device libm: thin wrappers over CUDA libdevice (linked as bitcode).
 // The device build compiles everything with -fno-builtin, so libm calls
 // stay calls and resolve here instead of becoming LLVM intrinsics the

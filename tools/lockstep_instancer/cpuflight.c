@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // cpuflight: the CPU twin of cudaflight's external-physics API, as a shared
 // library. N Betaflight instances run in-process through the IR-instanced
 // SITL_LOCKSTEP firmware (sitl_lockstep_instance.c manages the per-instance

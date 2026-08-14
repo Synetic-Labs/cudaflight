@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 // socket networking does not exist on the GPU; types only, for headers
 // that declare TCP-backed structs which are never instantiated there

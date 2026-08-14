@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Host runner for the GPU SITL_LOCKSTEP build.
 //
 // Loads the device module (real Betaflight firmware compiled for NVPTX

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Oracle tests for the Python BetaflightEnv, mirroring gpu_runner
 --test-step but driven entirely through zero-copy torch tensors:
 

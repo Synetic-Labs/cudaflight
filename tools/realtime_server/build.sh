@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Build betaflight_realtime_server.elf: the single-instance CPU SITL_LOCKSTEP
 # real-time pose server — real Betaflight firmware + first-principles quad
 # physics on the CPU, served over localhost TCP to an external renderer client.

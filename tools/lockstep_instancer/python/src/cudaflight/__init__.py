@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Betaflight firmware runtime: pre-built fatbin + host library + Python wrappers.
 
 The torch and JAX environment classes live in submodules (``torch_env``, ``jax_env``)

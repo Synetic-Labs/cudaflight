@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * See firstprinciples_physics.h. C port of drone_models' first_principles ODE
  * (the model crazyflow integrates), explicit-Euler, single drone.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """JAX interface to the GPU Betaflight fleet.
 
 Same library and device buffers as the torch wrapper, JAX-idiomatic

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #define M_E        2.7182818284590452354
 #define M_LOG2E    1.4426950408889634074

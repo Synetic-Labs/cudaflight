@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Build the GPU (NVPTX) SITL_LOCKSTEP module + host runner.
 #
 # Same shape as build_multi.sh, different backend: every firmware TU is

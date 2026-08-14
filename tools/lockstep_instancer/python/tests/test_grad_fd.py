@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Validate the finite-difference gradient of the real Betaflight control law.
 
 1. Baseline probe: run bflRateCore once for a flying action and read the raw
