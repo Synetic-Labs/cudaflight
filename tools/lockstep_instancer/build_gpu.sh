@@ -67,6 +67,10 @@ echo "== building instancer (against $("$LLVMCONFIG" --version))"
 echo "== flag harvest"
 if [ ! -f obj/multi/cmds.txt ]; then
     mkdir -p obj/multi
+    # A real build must precede the -B -n harvest: in a pristine tree the
+    # dry run prints unresolved vpath sources (common/chirp.c instead of
+    # ./src/main/common/chirp.c) and every bitcode compile fails.
+    make TARGET=SITL_LOCKSTEP CROSS_CC=clang -j"$(nproc)" > /dev/null
     make TARGET=SITL_LOCKSTEP CROSS_CC=clang -B -n > obj/multi/cmds.txt 2>/dev/null
 fi
 
@@ -140,7 +144,12 @@ fatbinary --64 --create="$OUT/fw.fatbin" $FATBIN_IMAGES
 echo "   $n_kernels kernels, $(wc -c < "$OUT/fw.fatbin") B fatbin (${ARCHS// /+})"
 
 echo "== host runner + cudaflight shared lib"
-g++ -O2 tools/lockstep_instancer/gpu_runner.cpp -I"$CUDA_HOME/include" -lcuda -o "$OUT/gpu_runner"
-g++ -O2 -shared -fPIC tools/lockstep_instancer/cudaflight.cpp -I"$CUDA_HOME/include" -lcuda -o "$OUT/libcudaflight.so"
+# Link against the toolkit's driver stub (-L stubs): systems like WSL ship
+# only libcuda.so.1, no libcuda.so dev symlink. Runtime still resolves the
+# real driver's libcuda.so.1.
+g++ -O2 tools/lockstep_instancer/gpu_runner.cpp -I"$CUDA_HOME/include" \
+    -L"$CUDA_HOME/lib64/stubs" -lcuda -o "$OUT/gpu_runner"
+g++ -O2 -shared -fPIC tools/lockstep_instancer/cudaflight.cpp -I"$CUDA_HOME/include" \
+    -L"$CUDA_HOME/lib64/stubs" -lcuda -o "$OUT/libcudaflight.so"
 
 echo "== done: $OUT/gpu_runner --module $OUT/fw.fatbin"

@@ -28,10 +28,18 @@ PYTHON     ?= python3
 # it is a 14MB arch-locked binary regenerated on every firmware build). Keep
 # VERSION in sync with pyproject.toml; the tag is namespaced (cudaflight-v*) so it
 # does not collide with the firmware-version release tags.
-VERSION    ?= 0.3.1
+VERSION    ?= 0.3.2
 REPO       ?= synaptech-solutions/cudaflight
 TAG        := cudaflight-v$(VERSION)
-WHEEL      := dist/cudaflight-$(VERSION)-py3-none-linux_x86_64.whl
+
+# Platform tag the shipped wheel must satisfy. auditwheel verifies every
+# bundled .so against the manylinux_2_39 policy (glibc <= 2.39, i.e. runs on
+# Ubuntu 24.04+) and FAILS the build if the host toolchain linked anything
+# newer — a wheel built on a too-new glibc can no longer ship silently.
+# libcuda.so.1 is excluded: it comes from the target's NVIDIA driver.
+# Requires auditwheel + patchelf (pip install build auditwheel patchelf).
+PLAT       ?= manylinux_2_39_x86_64
+WHEEL      := dist/cudaflight-$(VERSION)-py3-none-$(PLAT).whl
 
 .PHONY: all wheel firmware firmware-cpu artifacts clean release
 
@@ -55,6 +63,9 @@ artifacts: firmware firmware-cpu
 wheel: artifacts
 	rm -rf build dist *.egg-info src/*.egg-info
 	$(PYTHON) -m build --wheel
+	$(PYTHON) -m auditwheel repair --plat $(PLAT) --only-plat --exclude libcuda.so.1 \
+		--wheel-dir dist dist/cudaflight-$(VERSION)-py3-none-linux_x86_64.whl
+	rm dist/cudaflight-$(VERSION)-py3-none-linux_x86_64.whl
 
 # Publish the built wheel as a GitHub Release asset. Creates the tag's
 # release on first run, re-uploads (--clobber) on subsequent runs so a
@@ -69,7 +80,7 @@ release: wheel
 		echo "Creating release $(TAG)"; \
 		gh release create $(TAG) $(WHEEL) --repo $(REPO) \
 			--title "cudaflight $(VERSION)" \
-			--notes "Prebuilt cudaflight wheel (Linux x86_64, CUDA 12.x). pip install the asset URL directly."; \
+			--notes "Prebuilt cudaflight wheel ($(PLAT): glibc 2.39+, Ubuntu 24.04+; GPU backend needs an R580+ NVIDIA driver). pip install the asset URL directly."; \
 	fi
 	@echo "Installable from: https://github.com/$(REPO)/releases/download/$(TAG)/$(notdir $(WHEEL))"
 

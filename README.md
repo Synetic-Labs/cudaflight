@@ -43,8 +43,9 @@ float motor outputs.
 
 ## Quick start
 
-Requirements: Linux x86_64, clang/LLVM (with `llvm-config`), and for the GPU
-backend a CUDA 12.x+ toolkit plus an NVIDIA GPU.
+Requirements: Linux x86_64, clang/LLVM 20+ (with `llvm-config`; older clang
+crashes on NVPTX varargs codegen), and for the GPU backend a CUDA 12.x+
+toolkit plus an NVIDIA GPU.
 
 ```bash
 # CPU fleet library (no CUDA needed)

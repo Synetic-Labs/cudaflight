@@ -61,7 +61,11 @@ clang -O2 -fPIC -ffunction-sections -fdata-sections -c "$OUT/fw_final.bc" -o "$O
 echo "== linking"
 linkcmd=$(grep -E '^clang -o obj/main/betaflight_SITL_LOCKSTEP\.elf' "$OUT/cmds.txt" | head -1)
 [ -n "$linkcmd" ] || { echo "link-command harvest from $OUT/cmds.txt failed"; exit 1; }
-flags=$(sed -E 's|^clang -o [^ ]+ ||; s|obj/main/SITL_LOCKSTEP/[^ ]+\.o ?||g' <<<"$linkcmd")
+# -flto is dropped: every input object is already fully codegenned (the
+# instanced module via clang -c above, the harness via the native make), so
+# link-time LTO is a no-op — but the flag makes the clang driver demand an
+# LTO linker plugin (LLVMgold.so) that not every toolchain ships.
+flags=$(sed -E 's|^clang -o [^ ]+ ||; s|obj/main/SITL_LOCKSTEP/[^ ]+\.o ?||g; s| -flto[^ ]*||g' <<<"$linkcmd")
 clang -o "$OUT/betaflight_SITL_LOCKSTEP_MULTI" \
     "$OUT/fw_inst.o" \
     obj/main/SITL_LOCKSTEP/SIMULATOR/sitl_lockstep_main.o \
