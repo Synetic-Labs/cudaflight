@@ -1,16 +1,24 @@
 # Build the cudaflight wheel.
 #
-#   make wheel         build both firmwares then package
-#   make artifacts     build both firmwares and copy the data files (skip the wheel)
+#   make wheel         build both firmwares + the XLA shim, then package
+#   make artifacts     build everything and copy the data files (skip the wheel)
 #   make firmware      just rebuild fw.fatbin / libcudaflight.so
 #   make firmware-cpu  just rebuild libcpuflight.so
+#   make shim          just rebuild libcudaflight_xla.so (XLA FFI handlers)
 #   make release       build the wheel and upload it as a GitHub Release asset
 #   make clean         wipe build/, dist/, and the bundled data files
 #
-# The wheel ships fw.fatbin, libcudaflight.so and libcpuflight.so under
+# The wheel ships fw.fatbin, libcudaflight.so, libcpuflight.so and
+# libcudaflight_xla.so (the in-jit XLA FFI handlers, cudaflight.xla) under
 # cudaflight/_data/ alongside the MAX7456 font from the firmware tree, so
 # importlib.resources resolves all runtime artifacts without reaching
-# outside the wheel.
+# outside the wheel. The shim SOURCE (cudaflight_xla.cpp) ships too, as the
+# fallback for boxes where the prebuilt handlers cannot load.
+#
+# The shim compiles against the build venv's jaxlib FFI headers (the XLA FFI
+# C ABI is versioned and stable) and links only libcuda from the NVIDIA
+# driver — no CUDA toolkit headers. `make shim` therefore needs `jax` in
+# $(PYTHON)'s environment.
 
 ROOT       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../..)
 GPU_OUT    := $(ROOT)/obj/gpu
@@ -28,7 +36,7 @@ PYTHON     ?= python3
 # it is a 14MB arch-locked binary regenerated on every firmware build). Keep
 # VERSION in sync with pyproject.toml; the tag is namespaced (cudaflight-v*) so it
 # does not collide with the firmware-version release tags.
-VERSION    ?= 0.3.2
+VERSION    ?= 0.3.3
 REPO       ?= synaptech-solutions/cudaflight
 TAG        := cudaflight-v$(VERSION)
 
@@ -41,7 +49,12 @@ TAG        := cudaflight-v$(VERSION)
 PLAT       ?= manylinux_2_39_x86_64
 WHEEL      := dist/cudaflight-$(VERSION)-py3-none-$(PLAT).whl
 
-.PHONY: all wheel firmware firmware-cpu artifacts clean release
+SHIM_SRC   := $(CURDIR)/xla_shim/cudaflight_xla.cpp
+# libcuda link dirs: driver installs + toolkit stubs + WSL2 (only -L hints;
+# missing dirs are harmless). auditwheel excludes libcuda.so.1 from the wheel.
+SHIM_LDIRS := -L/usr/lib/x86_64-linux-gnu -L/usr/local/cuda/lib64/stubs -L/usr/lib/wsl/lib
+
+.PHONY: all wheel firmware firmware-cpu shim artifacts clean release
 
 all: wheel
 
@@ -53,7 +66,16 @@ firmware:
 firmware-cpu:
 	cd $(ROOT) && bash tools/lockstep_instancer/build_multi.sh
 
-artifacts: firmware firmware-cpu
+# XLA FFI handlers (cudaflight.xla) — in-jit firmware step/reset custom calls.
+# Compiled against $(PYTHON)'s jaxlib headers; ships prebuilt + as source.
+shim:
+	mkdir -p $(DATA)
+	g++ -std=c++17 -O2 -shared -fPIC \
+		-I$$($(PYTHON) -c "import jax.ffi; print(jax.ffi.include_dir())") \
+		$(SHIM_SRC) $(SHIM_LDIRS) -lcuda -o $(DATA)/libcudaflight_xla.so
+	cp $(SHIM_SRC) $(DATA)/cudaflight_xla.cpp
+
+artifacts: firmware firmware-cpu shim
 	mkdir -p $(DATA)
 	cp $(GPU_OUT)/libcudaflight.so $(DATA)/libcudaflight.so
 	cp $(GPU_OUT)/fw.fatbin   $(DATA)/fw.fatbin
@@ -87,3 +109,4 @@ release: wheel
 clean:
 	rm -rf build dist *.egg-info src/*.egg-info
 	rm -f $(DATA)/libcudaflight.so $(DATA)/libcpuflight.so $(DATA)/fw.fatbin $(DATA)/font_betaflight.c
+	rm -f $(DATA)/libcudaflight_xla.so $(DATA)/cudaflight_xla.cpp

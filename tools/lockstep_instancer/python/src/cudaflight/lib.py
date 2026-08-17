@@ -110,8 +110,11 @@ def load(lib_path: "str | os.PathLike[str] | None" = None) -> ctypes.CDLL:
                  "cudaflight_reset_kernel", "cudaflight_snap_state_ptr", "cudaflight_snap_ptr",
                  "cudaflight_jac_fd_kernel", "cudaflight_grad_scratch_ptr",
                  "cudaflight_jac_fd_pure_kernel",
+                 "cudaflight_grad_kernel", "cudaflight_jac_grad_pure_kernel",
                  "cudaflight_set_base_kernel", "cudaflight_stride", "cudaflight_state_size",
                  "cudaflight_inst_ptr"):
+        if not hasattr(lib, name):  # older libcudaflight.so builds lack some getters
+            continue
         getattr(lib, name).restype = ctypes.c_uint64
         getattr(lib, name).argtypes = [ctypes.c_void_p]
     for name in ("cudaflight_grid", "cudaflight_block"):

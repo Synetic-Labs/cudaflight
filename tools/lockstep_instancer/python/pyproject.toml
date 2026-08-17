@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cudaflight"
-version = "0.3.2"
+version = "0.3.3"
 description = "Real-Betaflight firmware compiled to NVPTX, with a Python loader and ctypes binding for libcudaflight.so."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,7 +24,7 @@ dependencies = []  # core loader is stdlib-only (ctypes + importlib.resources)
 torch = ["torch", "numpy"]
 # CPU-only jax cannot back the env (it needs jax.devices("gpu"))
 jax = ["jax[cuda12]"]
-viz = ["torch", "numpy", "pygame", "pillow"]
+viz = ["torch", "numpy", "pygame-ce", "pillow"]
 
 [project.scripts]
 wall-of-betaflight = "cudaflight.wall_of_betaflight:main"
