@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cudaflight"
+version = "0.4.0"
+description = "Real-Betaflight firmware compiled to NVPTX, with a Python loader and ctypes binding for libcudaflight.so."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+authors = [{ name = "Luke Wriglesworth", email = "luke@synetic.dev" }]
+keywords = ["betaflight", "drone", "rl", "gpu", "cuda", "firmware"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = []  # core loader is stdlib-only (ctypes + importlib.resources)
+
+[project.optional-dependencies]
+torch = ["torch", "numpy"]
+# CPU-only jax cannot back the env (it needs jax.devices("gpu"))
+jax = ["jax[cuda12]"]
+viz = ["torch", "numpy", "pygame-ce", "pillow"]
+
+[project.scripts]
+wall-of-betaflight = "cudaflight.wall_of_betaflight:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"cudaflight" = ["_data/*"]

@@ -21,8 +21,14 @@ README.pdf
 
 # artefacts of top-level Makefile
 /downloads/
-/tools/
 /build/
+# downloaded toolchains (make arm_sdk_install) land in /tools;
+# only the fork's source directories are tracked
+/tools/*
+!/tools/lockstep_instancer/
+!/tools/realtime_server/
+# binaries rebuilt by build_gpu.sh / build_multi.sh
+/tools/lockstep_instancer/instancer
 # local changes only
 mk/local.mk
 
@@ -55,6 +61,11 @@ ubuntu*.log
 
 # EEPROM image file (created by SITL)
 eeprom.bin
+
+__pycache__/
+
+# MuJoCo warning log (created by external-physics backends)
+MUJOCO_LOG.TXT
 
 # config used for building targets
 # changed to submodule
