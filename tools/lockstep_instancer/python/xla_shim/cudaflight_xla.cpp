@@ -406,6 +406,78 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
     {ffi::Traits::kCmdBufferCompatible});  // stream-only -> CUDA-graph capturable
 
 
+// Pure masked reset, V2: the snapshot rides as caller-owned READ-ONLY buffer
+// arguments instead of baked device addresses. With this handler the library's
+// own snapshot copies can be freed (cudaflight_release_snapshots) — ALL
+// firmware data then lives in caller (XLA) buffers; the library keeps only
+// code and launch configuration. The kernel copies the same bytes as V1, so
+// behavior is unchanged; restored instances still carry a stale blobBase that
+// the next step's rebase-on-entry fixes.
+static ffi::Error BfResetPureV2Impl(
+    cudaStream_t stream,
+    int64_t set_base_fn, int64_t reset_fn, int64_t cuctx,
+    int64_t grid, int64_t block,
+    ffi::Buffer<ffi::U8> blob, ffi::Buffer<ffi::U8> fwstate,
+    ffi::Buffer<ffi::U8> snap, ffi::Buffer<ffi::U8> snapst,
+    ffi::Buffer<ffi::U8> mask,
+    ffi::Result<ffi::Buffer<ffi::U8>> blob_out,
+    ffi::Result<ffi::Buffer<ffi::U8>> fwstate_out)
+{
+    (void)blob_out;
+    (void)fwstate_out;
+
+    CUcontext cur = nullptr;
+    cuCtxGetCurrent(&cur);
+    if (cur == nullptr) {
+        cuCtxSetCurrent((CUcontext)cuctx);
+    }
+
+    char *base = (char *)blob.untyped_data();
+    void *sbargs[] = { &base };
+    CUresult rc = cuLaunchKernel((CUfunction)set_base_fn, 1, 1, 1, 1, 1, 1,
+                                 0, (CUstream)stream, sbargs, nullptr);
+    if (rc != CUDA_SUCCESS) {
+        const char *msg = nullptr;
+        cuGetErrorString(rc, &msg);
+        return ffi::Error(ffi::ErrorCode::kInternal,
+                          std::string("bfSetBase(resetV2) launch failed: ") + (msg ? msg : "?"));
+    }
+
+    void *st = fwstate.untyped_data();
+    void *ss = snapst.untyped_data();
+    void *sn = snap.untyped_data();
+    void *m = mask.untyped_data();
+    void *args[] = { &st, &ss, &sn, &m };
+    rc = cuLaunchKernel((CUfunction)reset_fn, (unsigned)grid, 1, 1,
+                        (unsigned)block, 1, 1, 0, (CUstream)stream, args, nullptr);
+    if (rc != CUDA_SUCCESS) {
+        const char *msg = nullptr;
+        cuGetErrorString(rc, &msg);
+        return ffi::Error(ffi::ErrorCode::kInternal,
+                          std::string("bfReset(pureV2) launch failed: ") + (msg ? msg : "?"));
+    }
+    return ffi::Error::Success();
+}
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(
+    BfResetPureV2, BfResetPureV2Impl,
+    ffi::Ffi::Bind()
+        .Ctx<ffi::PlatformStream<cudaStream_t>>()
+        .Attr<int64_t>("set_base_fn")
+        .Attr<int64_t>("reset_fn")
+        .Attr<int64_t>("cuctx")
+        .Attr<int64_t>("grid")
+        .Attr<int64_t>("block")
+        .Arg<ffi::Buffer<ffi::U8>>()    // blob            [N*stride]
+        .Arg<ffi::Buffer<ffi::U8>>()    // fwstate         [N*stateSize]
+        .Arg<ffi::Buffer<ffi::U8>>()    // snapshot blob   [N*stride]    (read-only)
+        .Arg<ffi::Buffer<ffi::U8>>()    // snapshot state  [N*stateSize] (read-only)
+        .Arg<ffi::Buffer<ffi::U8>>()    // mask            [N]
+        .Ret<ffi::Buffer<ffi::U8>>()    // blob_out   (alias 0)
+        .Ret<ffi::Buffer<ffi::U8>>(),   // fwstate_out(alias 1)
+    {ffi::Traits::kCmdBufferCompatible});  // stream-only -> CUDA-graph capturable
+
+
 // ===========================================================================
 // Value-threaded ("pure") control-law Jacobian for the differentiable rollout.
 // The custom_vjp's forward needs J[k][i][d] = d(motor_i)/d(action_d) at the

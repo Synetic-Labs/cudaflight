@@ -93,6 +93,11 @@ def load(lib_path: "str | os.PathLike[str] | None" = None) -> ctypes.CDLL:
         lib.cudaflight_write_aux_host.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
     for name in ("cudaflight_reset_done", "cudaflight_reset_all", "cudaflight_snapshot", "cudaflight_sync"):
         getattr(lib, name).argtypes = [ctypes.c_void_p]
+    # Frees the library-side snapshot copies once the caller carries the snapshot
+    # in its own buffers (the BfResetPureV2 path). Guarded: absent before 0.3.4.
+    if hasattr(lib, "cudaflight_release_snapshots"):
+        lib.cudaflight_release_snapshots.restype = ctypes.c_int
+        lib.cudaflight_release_snapshots.argtypes = [ctypes.c_void_p]
     lib.cudaflight_hashes.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint64)]
     lib.cudaflight_destroy.argtypes = [ctypes.c_void_p]
     # OSD readback

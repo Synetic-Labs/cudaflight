@@ -564,6 +564,26 @@ int cudaflight_snapshot(cudaflight *g)
     return launch(g, g->fSnapshot, args);
 }
 
+// Free the library-side snapshot buffers. For callers that carry the snapshot
+// as caller-owned buffers instead (the BfResetPureV2 FFI handler takes it as
+// arguments): copy snapBuf/snapStBuf out first, then release. Afterwards the
+// snapshot getters return 0 and every library-side reset (reset_mask/
+// reset_done/reset_all, cudaflight_snapshot, the attribute-based pure reset)
+// is invalid — the caller owns the snapshot from here on.
+int cudaflight_release_snapshots(cudaflight *g)
+{
+    CtxGuard guard(g->ctx);
+    if (g->snapBuf) {
+        cuMemFree(g->snapBuf);
+        g->snapBuf = 0;
+    }
+    if (g->snapStBuf) {
+        cuMemFree(g->snapStBuf);
+        g->snapStBuf = 0;
+    }
+    return 0;
+}
+
 // Copy actions from another device buffer (float32 [n, act_dim]) into the
 // actions buffer — for frameworks with immutable arrays (JAX) that cannot
 // write into our buffer in place. Caller must ensure the source is fully

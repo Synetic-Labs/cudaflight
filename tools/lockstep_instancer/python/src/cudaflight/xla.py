@@ -182,7 +182,19 @@ def register() -> None:
     reg("bf_reset_pure", lib.BfResetPure)
     reg("bf_fw_step_jac_fd_pure", lib.BfFwStepJacFDPure)
     reg("bf_fw_step_jac_grad_pure", lib.BfFwStepJacGradPure)
+    if hasattr(lib, "BfResetPureV2"):  # absent from pre-0.3.4 handler builds
+        reg("bf_reset_pure_v2", lib.BfResetPureV2)
+    else:
+        global SUPPORTS_SNAPSHOT_ARGS
+        SUPPORTS_SNAPSHOT_ARGS = False
     _registered = True
+
+
+#: True when the handler library provides BfResetPureV2 — the snapshot-as-
+#: buffer-arguments reset (see reset_pure_call's `snapshot` parameter).
+#: register() downgrades this to False when an older handler build loads
+#: (e.g. a CUDAFLIGHT_XLA_LIB override).
+SUPPORTS_SNAPSHOT_ARGS = True
 
 
 # ---------------------------------------------------------------------------
@@ -412,35 +424,47 @@ def fw_step_pure_call(
 
 
 def reset_pure_call(
-    lib: ctypes.CDLL, handle: int
+    lib: ctypes.CDLL, handle: int, snapshot: tuple[Any, Any] | None = None
 ) -> Callable[[Any, Any, Any], tuple[Any, Any]]:
     """Build the *pure* masked firmware reset for a cudaflight fleet.
 
     Restores the flagged instances in the value-threaded blob + bfFlight_t state
     to the episode-start snapshot. Returns reset_pure(blob, fwstate, mask [N u8])
-    -> (blob, fwstate), blob/fwstate aliased in place (donated). Snapshot source
-    is the handle's snapshot buffers (read-only). The restored instances carry a
-    stale blobBase, fixed by the next step's rebase-on-entry."""
+    -> (blob, fwstate), blob/fwstate aliased in place (donated). The restored
+    instances carry a stale blobBase, fixed by the next step's rebase-on-entry.
+
+    `snapshot`: None reads the handle's library-side snapshot buffers through
+    baked device addresses (works on every handler build). A `(snap_blob,
+    snap_state)` pair of caller-owned uint8 arrays (see `snapshot_state`) rides
+    into the call as READ-ONLY buffer arguments instead — after which the
+    library-side copies can be freed (`cudaflight_release_snapshots`), leaving
+    all firmware data in caller buffers. Needs a >= 0.3.4 handler build
+    (SUPPORTS_SNAPSHOT_ARGS)."""
     import jax
     import jax.numpy as jnp
     import numpy as np
 
     register()
+    if snapshot is not None and not SUPPORTS_SNAPSHOT_ARGS:
+        raise RuntimeError(
+            "snapshot-as-arguments reset needs the BfResetPureV2 handler "
+            "(cudaflight >= 0.3.4); the loaded handler library lacks it")
     n = lib.cudaflight_num_envs(handle)
     stride = lib.cudaflight_stride(handle)
     state_size = lib.cudaflight_state_size(handle)
     attrs = dict(
         set_base_fn=int(lib.cudaflight_set_base_kernel(handle)),
         reset_fn=int(lib.cudaflight_reset_kernel(handle)),
-        snapst=int(lib.cudaflight_snap_state_ptr(handle)),
-        snap=int(lib.cudaflight_snap_ptr(handle)),
         cuctx=int(lib.cudaflight_ctx(handle)),
         grid=int(lib.cudaflight_grid(handle)),
         block=int(lib.cudaflight_block(handle)),
     )
+    if snapshot is None:
+        attrs["snapst"] = int(lib.cudaflight_snap_state_ptr(handle))
+        attrs["snap"] = int(lib.cudaflight_snap_ptr(handle))
 
     call = jax.ffi.ffi_call(
-        "bf_reset_pure",
+        "bf_reset_pure" if snapshot is None else "bf_reset_pure_v2",
         (jax.ShapeDtypeStruct((n * stride,), jnp.uint8),       # blob_out
          jax.ShapeDtypeStruct((n * state_size,), jnp.uint8)),  # fwstate_out
         input_output_aliases={0: 0, 1: 1},
@@ -451,9 +475,14 @@ def reset_pure_call(
     # restores integer firmware state — blob/fwstate/mask are all uint8
     # (non-differentiable) — so it contributes no policy gradient. Without a
     # rule the bare ffi_call has no jvp and the linearisation pass raises.
+    # The captured snapshot arrays are constants of the trace; AD never
+    # touches them.
     @jax.custom_vjp
     def reset_pure(blob: Any, fwstate: Any, mask: Any) -> tuple[Any, Any]:
-        return call(blob, fwstate, mask, **attrs)
+        if snapshot is None:
+            return call(blob, fwstate, mask, **attrs)
+        snap_blob, snap_state = snapshot
+        return call(blob, fwstate, snap_blob, snap_state, mask, **attrs)
 
     def reset_pure_fwd(blob, fwstate, mask):
         return reset_pure(blob, fwstate, mask), None
