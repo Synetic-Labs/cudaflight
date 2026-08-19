@@ -70,10 +70,9 @@ Prebuilt wheels are published as GitHub Release assets — see
 [`tools/lockstep_instancer/python/README.md`](tools/lockstep_instancer/python/README.md)
 for packaging, hosting, and install details.
 
-An environment can boot from a real quad's CLI dump converted to an EEPROM
-image, so the simulated fleet flies the exact tune of the physical aircraft;
-reference configs for the BetaFPV Air75 live in
-`tools/lockstep_instancer/configs/`.
+An environment can boot from a real quad's CLI dump rendered to an EEPROM
+image, so the simulated fleet flies the exact tune of the physical aircraft —
+see the Configs section below.
 
 ## Repository layout (fork additions)
 
@@ -103,12 +102,21 @@ physical aircraft.
 
 Drone configs are CLI text (`dump all` from the configurator), owned by the
 consuming trainer's repo. The binary eeprom image is a derived artifact: render
-it at use time with `cudaflight.render_eeprom()` (or the harness binary's
-`--cli-dump` mode) and never commit it — a committed image one parameter-group
-version behind the firmware makes Betaflight factory-reset the whole config at
-boot, with no error. The renderer is strict instead: any rejected line fails
-the render and is named. cudaflight itself carries no drone configs, only the
-stock dump of its own build; see `tools/lockstep_instancer/configs/example/`.
+it at use time with `cudaflight.render_eeprom()` and never commit it — a
+committed image one parameter-group version behind the firmware makes
+Betaflight factory-reset the whole config at boot, with no error.
+
+The render is safe by three mechanical checks: a VERSION GATE (the dump's
+header names its firmware release + commit; anything but this wheel's firmware
+is refused — at exact parity every rejected line is provably a hardware
+feature the SITL build compiles out, skipped and reported), STRICT OVERRIDES
+(hand-written sim-only lines get no leniency), and ROUND-TRIP VERIFICATION
+(the firmware re-dumps after the save; every sim-known setting must hold the
+dump's value). A firmware version is a build parameter, not repo content:
+`tools/lockstep_instancer/build_for_base.sh <commit>` produces the wheel for
+any Betaflight base, versioned `+bf.<hash>` so the wheel carries its own base
+identity. cudaflight carries no drone configs, only the stock dump of its own
+build; see `tools/lockstep_instancer/configs/example/`.
 
 ## Roadmap
 

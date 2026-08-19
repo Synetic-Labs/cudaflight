@@ -21,10 +21,12 @@ import cudaflight
 image = cudaflight.render_eeprom(Path("stock_dump.txt"))
 ```
 
-Rendering is strict: any line the firmware rejects fails the render and
-every rejected setting is named. Repair renamed settings with the
-`overrides` argument (CLI text appended after the dump; last value wins).
-List rejects without failing: `python -m cudaflight.config dump.txt`.
+The render refuses any dump whose firmware (header: release + commit) is
+not this wheel's firmware — build the matching wheel with
+`build_for_base.sh <commit>`. At exact parity, rejected lines are hardware
+features the SITL build compiles out: skipped and reported. Overrides are
+strict, and a round-trip re-dump verifies every sim-known value. Inspect a
+dump: `python -m cudaflight.config dump.txt`.
 
 Never commit a rendered `.bin`: it is valid only for the exact firmware
 build that wrote it. A stale image does not fail at boot — one

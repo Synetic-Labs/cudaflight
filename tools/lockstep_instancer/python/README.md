@@ -102,15 +102,23 @@ from pathlib import Path
 import cudaflight
 
 image = cudaflight.render_eeprom(
-    Path("drone_dump.txt"),        # dump all from the drone
-    Path("sim_overrides.txt"),     # optional: sim-only lines + rename repairs
+    Path("drone_dump.txt"),        # complete `dump all` from the drone
+    Path("sim_overrides.txt"),     # optional: sim-only lines; strict
 )
 ```
 
-Rendering is strict: any line the firmware rejects fails the render and
-every rejected setting is named — that is how a wheel upgrade that renames
-or removes a setting surfaces, instead of the setting silently reverting to
-a compiled default. List rejects without failing:
+Three mechanical checks make this safe. The VERSION GATE: the dump's header
+names its firmware (release + commit); the render refuses anything but this
+wheel's own firmware — use the wheel built on the dump's base
+(`build_for_base.sh <commit>`; the base rides in the wheel version as
+`+bf.<hash>`). At exact parity, every rejected line is provably a hardware
+feature the SITL build compiles out — skipped and reported, never silent.
+STRICT OVERRIDES: the render runs twice, and any error the hand-written
+overrides add fails it — a typo cannot pass as a hardware gap. ROUND-TRIP
+VERIFICATION: after the save the firmware re-dumps itself, and every
+sim-known setting must hold the dump's value (or the override's).
+
+Inspect a dump without booting a fleet:
 `python -m cudaflight.config dump.txt [overrides.txt]`. Never commit a
 rendered `.bin`: one parameter-group version of drift makes the firmware
 factory-reset the whole config at boot without a word. See
