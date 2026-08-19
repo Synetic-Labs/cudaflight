@@ -73,7 +73,8 @@ done
 sed -i "s|^VERSION    ?= .*|VERSION    ?= $VERSION|" tools/lockstep_instancer/python/Makefile
 sed -i "s|^version = \".*\"|version = \"$VERSION\"|" tools/lockstep_instancer/python/pyproject.toml
 
-export PATH=/usr/local/cuda/bin:/usr/lib/llvm-20/bin:$PATH
+# build venv bin first: auditwheel needs the pip-installed patchelf
+export PATH="$MAIN/tools/lockstep_instancer/python/.venv/bin:/usr/local/cuda/bin:/usr/lib/llvm-20/bin:$PATH"
 export CUDA_HOME=/usr/local/cuda
 export BFL_REVISION=$REV9   # the firmware header reports the BASE, not the dirty worktree
 
