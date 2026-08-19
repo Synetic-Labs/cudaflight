@@ -15,10 +15,12 @@
 # outside the wheel. The shim SOURCE (cudaflight_xla.cpp) ships too, as the
 # fallback for boxes where the prebuilt handlers cannot load.
 #
-# The shim compiles against the build venv's jaxlib FFI headers (the XLA FFI
-# C ABI is versioned and stable) and links only libcuda from the NVIDIA
-# driver — no CUDA toolkit headers. `make shim` therefore needs `jax` in
-# $(PYTHON)'s environment.
+# The shim compiles against the build venv's jaxlib FFI headers and links
+# only libcuda from the NVIDIA driver — no CUDA toolkit headers. `make shim`
+# therefore needs `jax` in $(PYTHON)'s environment. The FFI ABI is only
+# backward compatible: a shim built on NEWER jaxlib headers registers as a
+# silent no-op on an older runtime (NOT_FOUND at call time). Pin the build
+# venv's jax to the OLDEST version consumers run (the skyflow floor).
 
 ROOT       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../..)
 GPU_OUT    := $(ROOT)/obj/gpu
