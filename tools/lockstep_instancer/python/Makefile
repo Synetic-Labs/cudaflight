@@ -17,10 +17,15 @@
 #
 # The shim compiles against the build venv's jaxlib FFI headers and links
 # only libcuda from the NVIDIA driver — no CUDA toolkit headers. `make shim`
-# therefore needs `jax` in $(PYTHON)'s environment. The FFI ABI is only
-# backward compatible: a shim built on NEWER jaxlib headers registers as a
-# silent no-op on an older runtime (NOT_FOUND at call time). Pin the build
-# venv's jax to the OLDEST version consumers run (the skyflow floor).
+# therefore needs `jax` in $(PYTHON)'s environment.
+#
+# PIN THE BUILD VENV'S JAX TO 0.10.x. jaxlib 0.11.0/0.11.1 ship FFI headers
+# whose handler bundles register as a silent no-op — even on the matching
+# 0.11 runtime the handlers come back NOT_FOUND at call time, with no error
+# at register time (reproduced 2026-08-18, RTX 4090, jax 0.11.0 runtime).
+# Handlers built with 0.10.2 headers register and execute correctly on the
+# 0.11 runtime (the FFI ABI is backward compatible). Re-test the pin when
+# jax ships a fix.
 
 ROOT       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../..)
 GPU_OUT    := $(ROOT)/obj/gpu
