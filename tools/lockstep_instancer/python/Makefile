@@ -19,13 +19,15 @@
 # only libcuda from the NVIDIA driver — no CUDA toolkit headers. `make shim`
 # therefore needs `jax` in $(PYTHON)'s environment.
 #
-# PIN THE BUILD VENV'S JAX TO 0.10.x. jaxlib 0.11.0/0.11.1 ship FFI headers
-# whose handler bundles register as a silent no-op — even on the matching
-# 0.11 runtime the handlers come back NOT_FOUND at call time, with no error
-# at register time (reproduced 2026-08-18, RTX 4090, jax 0.11.0 runtime).
-# Handlers built with 0.10.2 headers register and execute correctly on the
-# 0.11 runtime (the FFI ABI is backward compatible). Re-test the pin when
-# jax ships a fix.
+# THE SHIM'S BUILD HEADERS MUST NOT BE NEWER THAN THE OLDEST CONSUMER
+# RUNTIME. jaxlib headers stamp each handler with an XLA FFI API version
+# (0.11.1 headers -> 0.4); an older runtime REJECTS such handlers at
+# registration. The CPU backend surfaces that rejection loudly
+# (INVALID_ARGUMENT naming both versions); the CUDA PJRT plugin swallows
+# it — registration "succeeds" and the call fails later with an
+# undebuggable NOT_FOUND (reproduced 2026-08-18: 0.11.1-header handler on
+# the 0.11.0 CUDA runtime; same handler works on the 0.11.1 runtime).
+# The build venv pins jax==0.10.2 for margin below every consumer.
 
 ROOT       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../..)
 GPU_OUT    := $(ROOT)/obj/gpu
