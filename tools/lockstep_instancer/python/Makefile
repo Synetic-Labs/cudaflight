@@ -27,7 +27,9 @@
 # it — registration "succeeds" and the call fails later with an
 # undebuggable NOT_FOUND (reproduced 2026-08-18: 0.11.1-header handler on
 # the 0.11.0 CUDA runtime; same handler works on the 0.11.1 runtime).
-# The build venv pins jax==0.10.2 for margin below every consumer.
+# Policy: the build venv tracks the LATEST jax release, and every consumer
+# pins that release as its jax floor (skyflow: jax>=0.11.1). Move both
+# together when jax updates.
 
 ROOT       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../../..)
 GPU_OUT    := $(ROOT)/obj/gpu
