@@ -66,9 +66,12 @@ LD_FLAGS    := \
 # gcc-LTO is off: the multi-instance pipeline does its own whole-program
 # step at the LLVM IR level, and the flag set must be clang-compatible
 # (-Ofast is a hard error on clang >= 20; -ffast-math comes from
-# OPTIMISATION_BASE; -Wunsafe-loop-optimizations is gcc-only).
+# OPTIMISATION_BASE; -Wunsafe-loop-optimizations is gcc-only). The LTO
+# flags are stripped here and not only via LTO=no: Makefiles before
+# 2026.6.1 leave -fuse-linker-plugin (gcc-only) in the flags even with
+# LTO=no, and this fragment must build on any base commit.
 LTO := no
-CFLAGS_DISABLED += -Wunsafe-loop-optimizations
+CFLAGS_DISABLED += -Wunsafe-loop-optimizations -flto=auto -fuse-linker-plugin
 
 # clang warns (as error) about INFINITY under -ffast-math; the firmware's
 # explog_approx.c uses it deliberately as a saturation value, same as on

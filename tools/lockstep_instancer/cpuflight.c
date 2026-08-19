@@ -250,15 +250,55 @@ cpuflight *cpuflight_create(uint32_t n, uint32_t settle_ms)
 // name, version-agnostic); the eeprom image is a derived artifact valid only
 // for this firmware build — render it at use time, never commit it.
 
-// Error lines from the last render, one per '\n'-joined entry (harness
-// heap, unbounded — per-instance firmware state must stay small).
-static char *g_renderErrs;
-static size_t g_renderErrsLen;
-static size_t g_renderErrsCap;
+// Harness-heap line accumulators for the last render (unbounded on purpose —
+// per-instance firmware state must stay small).
+typedef struct {
+    char *buf;
+    size_t len;
+    size_t cap;
+} lineAcc_t;
+
+static lineAcc_t g_renderErrs;   // output lines carrying a CLI error marker
+static lineAcc_t g_renderDump;   // the round-trip 'dump all' after the save
+
+static void accAppend(lineAcc_t *acc, const char *line)
+{
+    const size_t n = strlen(line);
+    if (acc->len + n + 2 > acc->cap) {
+        const size_t cap = (acc->cap ? acc->cap * 2 : 4096) + n + 2;
+        char *grown = realloc(acc->buf, cap);
+        if (!grown) {
+            return; // keep what we have; bflCliErrorCount still says how many
+        }
+        acc->buf = grown;
+        acc->cap = cap;
+    }
+    memcpy(acc->buf + acc->len, line, n);
+    acc->len += n;
+    acc->buf[acc->len++] = '\n';
+    acc->buf[acc->len] = '\0';
+}
+
+static void accReset(lineAcc_t *acc)
+{
+    acc->len = 0;
+    if (acc->buf) {
+        acc->buf[0] = '\0';
+    }
+}
 
 const char *cpuflight_render_errors(void)
 {
-    return g_renderErrs ? g_renderErrs : "";
+    return g_renderErrs.buf ? g_renderErrs.buf : "";
+}
+
+// The configuration that actually resulted from the last render, as the
+// firmware's own 'dump all' CLI text. The header carries the firmware's
+// exact release string; the body carries every setting this build knows,
+// with the values it accepted — callers verify against it.
+const char *cpuflight_render_dump(void)
+{
+    return g_renderDump.buf ? g_renderDump.buf : "";
 }
 
 static void renderErrSink(const char *line)
@@ -266,20 +306,12 @@ static void renderErrSink(const char *line)
     if (!strstr(line, "###ERROR") && !strstr(line, "ERR_CMD_NA")) {
         return;
     }
-    const size_t n = strlen(line);
-    if (g_renderErrsLen + n + 2 > g_renderErrsCap) {
-        const size_t cap = (g_renderErrsCap ? g_renderErrsCap * 2 : 4096) + n + 2;
-        char *grown = realloc(g_renderErrs, cap);
-        if (!grown) {
-            return; // keep what we have; the count still says how many
-        }
-        g_renderErrs = grown;
-        g_renderErrsCap = cap;
-    }
-    memcpy(g_renderErrs + g_renderErrsLen, line, n);
-    g_renderErrsLen += n;
-    g_renderErrs[g_renderErrsLen++] = '\n';
-    g_renderErrs[g_renderErrsLen] = '\0';
+    accAppend(&g_renderErrs, line);
+}
+
+static void renderDumpSink(const char *line)
+{
+    accAppend(&g_renderDump, line);
 }
 
 // Render a Betaflight CLI dump ("dump all" / "diff all" text) into a
@@ -324,10 +356,8 @@ int cpuflight_render_eeprom(const char *cli_text, uint32_t text_len, int strict,
         return -1;
     }
     g_active = true;
-    g_renderErrsLen = 0;
-    if (g_renderErrs) {
-        g_renderErrs[0] = '\0';
-    }
+    accReset(&g_renderErrs);
+    accReset(&g_renderDump);
 
     int rc = -1;
     char *san = NULL;
@@ -356,6 +386,13 @@ int cpuflight_render_eeprom(const char *cli_text, uint32_t text_len, int strict,
                  bflCliErrorCount(), bflCliFirstError());
         goto done;
     }
+
+    // round-trip: the saved configuration as this firmware's own CLI text
+    // (version header + every accepted value), for caller-side verification
+    bflCliSetSink(renderDumpSink);
+    static const char dumpCmd[] = "dump all\n";
+    bflCliExec(dumpCmd, sizeof(dumpCmd) - 1);
+    bflCliSetSink(NULL);
 
     const uint32_t eeSize = bflEepromSize();
     if (out_cap < eeSize) {

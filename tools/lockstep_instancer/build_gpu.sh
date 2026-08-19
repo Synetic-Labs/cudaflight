@@ -70,8 +70,8 @@ if [ ! -f obj/multi/cmds.txt ]; then
     # A real build must precede the -B -n harvest: in a pristine tree the
     # dry run prints unresolved vpath sources (common/chirp.c instead of
     # ./src/main/common/chirp.c) and every bitcode compile fails.
-    make TARGET=SITL_LOCKSTEP CROSS_CC=clang -j"$(nproc)" > /dev/null
-    make TARGET=SITL_LOCKSTEP CROSS_CC=clang -B -n > obj/multi/cmds.txt 2>/dev/null
+    make TARGET=SITL_LOCKSTEP CROSS_CC=clang ${BFL_REVISION:+REVISION=$BFL_REVISION} -j"$(nproc)" > /dev/null
+    make TARGET=SITL_LOCKSTEP CROSS_CC=clang ${BFL_REVISION:+REVISION=$BFL_REVISION} -B -n > obj/multi/cmds.txt 2>/dev/null
 fi
 
 echo "== compiling firmware TUs to nvptx bitcode"

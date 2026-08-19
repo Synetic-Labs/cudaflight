@@ -183,4 +183,8 @@ def load_cpu(lib_path: "str | os.PathLike[str] | None" = None) -> ctypes.CDLL:
             ctypes.POINTER(ctypes.c_uint8), ctypes.c_uint32,
             ctypes.POINTER(ctypes.c_uint32)]
         lib.cpuflight_render_errors.restype = ctypes.c_char_p
+    # round-trip 'dump all' of the rendered config (version gate +
+    # verification). Guarded: absent before 0.5.0.
+    if hasattr(lib, "cpuflight_render_dump"):
+        lib.cpuflight_render_dump.restype = ctypes.c_char_p
     return lib

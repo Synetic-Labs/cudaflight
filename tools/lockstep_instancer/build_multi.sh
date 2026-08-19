@@ -26,8 +26,8 @@ if [ ! -x "$INSTANCER" ] || [ tools/lockstep_instancer/instancer.cpp -nt "$INSTA
 fi
 
 echo "== native build (harness objects + flag harvest)"
-make TARGET=SITL_LOCKSTEP CROSS_CC=clang -j"$(nproc)" > /dev/null
-make TARGET=SITL_LOCKSTEP CROSS_CC=clang -B -n > "$OUT/cmds.txt" 2>/dev/null
+make TARGET=SITL_LOCKSTEP CROSS_CC=clang ${BFL_REVISION:+REVISION=$BFL_REVISION} -j"$(nproc)" > /dev/null
+make TARGET=SITL_LOCKSTEP CROSS_CC=clang ${BFL_REVISION:+REVISION=$BFL_REVISION} -B -n > "$OUT/cmds.txt" 2>/dev/null
 
 echo "== compiling firmware TUs to bitcode"
 : > "$OUT/bc_jobs.txt"

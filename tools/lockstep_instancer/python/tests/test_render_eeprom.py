@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Oracle tests for config.render_eeprom (CLI dump -> eeprom image):
 
-  A  happy path: the stock dump (this build's own 'dump all') renders
-     strictly — zero rejects — to a structurally valid image (magic, size,
-     walkable record stream)
-  B  loud rejection: a dump line the firmware does not know fails the
-     render and names the setting (never a silent fall-back to defaults);
-     a str that names a file instead of CLI text is refused
-  C  overrides: appended CLI text applies last and changes the image
+  A  happy path: the stock dump (this build's own 'dump all') renders at
+     exact parity — gate passes, zero gaps, round-trip verified — to a
+     structurally valid image (magic, size, walkable record stream)
+  B  refusals: text without a version header; a str that names a file
+     instead of CLI text; a dump whose release string is not this
+     firmware's (the version gate)
+  C  strict overrides: a typo'd override fails loudly; a valid override
+     applies last and changes the image
   D  boot: a fleet created from the rendered image boots and arms
 
 Run: CPUFLIGHT_LIB=../../obj/multi/libcpuflight.so python test_render_eeprom.py
@@ -40,43 +41,48 @@ def parse_records(image: bytes) -> dict[int, tuple[int, int]]:
     return records
 
 
+def expect_refusal(label: str, exc: type, needle: str, *args, **kwargs) -> bool:
+    try:
+        render_eeprom(*args, **kwargs)
+    except exc as e:
+        if needle in str(e):
+            print(f"[render-test] {label} refused as expected")
+            return True
+        print(f"[render-test] {label} FAIL: wrong message: {e}")
+        return False
+    print(f"[render-test] {label} FAIL: did not raise")
+    return False
+
+
 def main():
     ok = True
+    stock = (CONFIGS / "stock_dump.txt").read_bytes()
 
-    # A: the stock dump renders strictly, zero rejects
-    image = render_eeprom(CONFIGS / "stock_dump.txt")
+    # A: the stock dump renders at parity — gate, gaps, verification
+    image = render_eeprom(stock)
     records = parse_records(image)
     pid_ver, pid_size = records[14]  # PG_PID_PROFILE
     print(f"[render-test] A image={len(image)}B records={len(records)} "
           f"pid-profile v{pid_ver} ({pid_size}B)")
 
-    # B: an unknown setting must fail the render, loudly, naming it
-    try:
-        render_eeprom("set no_such_setting_xyz = 1\n")
-        print("[render-test] B FAIL: unknown setting did not raise")
-        ok = False
-    except RuntimeError as e:
-        print("[render-test] B rejected as expected")
-        if "no_such_setting_xyz" not in str(e):
-            print(f"[render-test] B FAIL: error does not name the setting: {e}")
-            ok = False
+    # B: refusals
+    ok &= expect_refusal("B1 headerless", RuntimeError, "version header",
+                         "set no_such_setting_xyz = 1\n")
+    ok &= expect_refusal("B2 str-path", ValueError, "pathlib.Path",
+                         str(CONFIGS / "stock_dump.txt"))
+    tampered = stock.replace(b" 2026.", b" 9999.", 1)
+    assert tampered != stock, "tamper target not found; fixture header changed?"
+    ok &= expect_refusal("B3 version gate", RuntimeError, "version gate", tampered)
 
-    # B2: a str that names a file must be refused (a pathname applied as
-    # CLI text would silently render a defaults image)
-    try:
-        render_eeprom(str(CONFIGS / "stock_dump.txt"))
-        print("[render-test] B2 FAIL: str path did not raise")
-        ok = False
-    except ValueError:
-        print("[render-test] B2 str-path trap refused as expected")
-
-    # C: overrides append after the dump and change the image
-    changed = render_eeprom(CONFIGS / "stock_dump.txt", "set motor_idle = 600\n")
+    # C: strict overrides
+    ok &= expect_refusal("C1 override typo", RuntimeError, "did not apply",
+                         stock, "set moter_idle_typo = 600\n")
+    changed = render_eeprom(stock, "set motor_idle = 600\n")
     if changed == image:
-        print("[render-test] C FAIL: override did not change the image")
+        print("[render-test] C2 FAIL: override did not change the image")
         ok = False
     else:
-        print("[render-test] C override applied")
+        print("[render-test] C2 override applied and round-trip verified")
 
     # D: a fleet created from the rendered image boots and arms
     lib = load_cpu()
