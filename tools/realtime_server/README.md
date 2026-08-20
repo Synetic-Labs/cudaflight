@@ -18,8 +18,8 @@ the OSD character grid.
   header comment.
 - `firstprinciples_physics.c/.h` — C port of drone_models'
   `first_principles` model (what crazyflow integrates), so this path matches
-  the training sim's physics. Airframe scalars are a 5" placeholder pending
-  sysid.
+  a validated reference dynamics model. Airframe scalars are a 5" placeholder
+  pending sysid.
 - `build.sh` — builds the server by reusing the exact firmware compile+link
   of the SITL_LOCKSTEP harness (LTO + sitl.ld), swapping in our main.
 

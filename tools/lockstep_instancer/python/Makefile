@@ -25,8 +25,8 @@
 # registration. The CPU backend surfaces that rejection loudly
 # (INVALID_ARGUMENT naming both versions); the CUDA PJRT plugin swallows
 # it — registration "succeeds" and the call fails later with an
-# undebuggable NOT_FOUND (reproduced 2026-08-18: 0.11.1-header handler on
-# the 0.11.0 CUDA runtime; same handler works on the 0.11.1 runtime).
+# undebuggable NOT_FOUND (e.g. a handler built against 0.11.1 headers on a
+# 0.11.0 CUDA runtime; the same handler works on a 0.11.1 runtime).
 # Policy: the build venv tracks the LATEST jax release, and every consumer
 # pins that release as its jax floor (skyflow: jax>=0.11.1). Move both
 # together when jax updates.

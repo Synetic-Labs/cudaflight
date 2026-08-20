@@ -5,7 +5,7 @@
 // state images; __bf_delta switches instances), stepped sequentially on the
 // host against sensors computed by an outside simulator.
 //
-// Scope: exactly the external-physics surface nav-style callers use —
+// Scope: exactly the external-physics surface an outside simulator needs —
 // create (boot/settle/arm/snapshot), fw_step (sticks+sensors -> motors),
 // aux channels, masked reset, destroy. No in-process RL task, no OSD wall.
 //

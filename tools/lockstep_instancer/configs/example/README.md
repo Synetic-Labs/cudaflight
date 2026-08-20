@@ -9,8 +9,8 @@
       tools/lockstep_instancer/configs/example/stock_dump.txt
   ```
 
-Real per-drone configs live with the trainer that owns the drone (its
-`drones/` directory), never in cudaflight.
+Keep real per-vehicle configs with the project that owns the vehicle,
+never in cudaflight — this directory holds test fixtures only.
 
 Render an eeprom image from CLI text at use time:
 

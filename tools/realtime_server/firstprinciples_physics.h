@@ -2,7 +2,7 @@
 /*
  * First-principles quad dynamics — a C port of drone_models' first_principles
  * model (the closed-form ODE crazyflow integrates), so the realtime CPU SITL
- * path matches the training sim's physics instead of the old hand-rolled quadSim.
+ * path follows a validated reference model instead of the hand-rolled quadSim.
  *
  * Structure (motor permutation, mixing matrix, rotor lag, FLU<->FRD flips,
  * sensor synthesis, explicit-Euler integration) is ported faithfully from the

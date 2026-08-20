@@ -80,10 +80,14 @@ class OsdWall:
 
     def mosaic(self, osd: torch.Tensor, attrs: "torch.Tensor | None" = None,
                grid: "tuple[int, int] | None" = None,
-               blink_phase: bool = False) -> torch.Tensor:
+               blink_phase: bool = False,
+               background: "torch.Tensor | None" = None) -> torch.Tensor:
         """osd: [K, rows, cols] uint8 CUDA tensor of font indices.
         attrs: optional matching attribute grids (bit 7 = blink).
         grid: (tiles_y, tiles_x), default a near-square layout.
+        background: optional [K, rows*18, cols*12, 3] uint8 per-tile
+        image composited where the OSD is transparent (the camera feed
+        a real MAX7456 would overlay).
         Returns an RGB uint8 [H, W, 3] CUDA tensor."""
         k = osd.shape[0]
         if grid is None:
@@ -108,13 +112,25 @@ class OsdWall:
         idx = (tiles.view(ty, tx, self.tile_h, self.tile_w)
                     .permute(0, 2, 1, 3)
                     .reshape(ty * self.tile_h, tx * self.tile_w))
-        return self.lut[idx.long()]                           # [H, W, 3]
+        out = self.lut[idx.long()]                            # [H, W, 3]
+        if background is not None:
+            bg = torch.nn.functional.pad(
+                background.permute(0, 3, 1, 2), (self.gap,) * 4)
+            bg = bg.permute(0, 2, 3, 1)                       # [K, th, tw, 3]
+            if ty * tx > k:
+                bg = torch.cat([bg, bg.new_zeros((ty * tx - k, *bg.shape[1:]))])
+            bgm = (bg.view(ty, tx, self.tile_h, self.tile_w, 3)
+                     .permute(0, 2, 1, 3, 4)
+                     .reshape(ty * self.tile_h, tx * self.tile_w, 3))
+            out = torch.where((idx == _PX_TRANSPARENT)[..., None], bgm, out)
+        return out
 
     def frame(self, osd: torch.Tensor, attrs: "torch.Tensor | None" = None,
               grid: "tuple[int, int] | None" = None, blink_phase: bool = False,
-              scale: float = 1.0) -> torch.Tensor:
+              scale: float = 1.0,
+              background: "torch.Tensor | None" = None) -> torch.Tensor:
         """mosaic() plus optional area-resampling to scale, as HWC uint8."""
-        img = self.mosaic(osd, attrs, grid, blink_phase)
+        img = self.mosaic(osd, attrs, grid, blink_phase, background)
         if scale != 1.0:
             f = img.permute(2, 0, 1)[None].float()
             f = torch.nn.functional.interpolate(

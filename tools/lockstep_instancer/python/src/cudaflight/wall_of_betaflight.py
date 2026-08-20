@@ -33,7 +33,55 @@ import time
 import torch
 
 from .torch_env import BetaflightEnv
-from .osd_wall import OsdWall
+from .osd_wall import GLYPH_H, GLYPH_W, OsdWall
+
+
+def _horizon_backdrop(obs: "torch.Tensor", h: int, w: int) -> "torch.Tensor":
+    """FPV-style backdrop from each instance's real state, [K, h, w, 3] u8.
+
+    Stands in for the camera feed a real MAX7456 would overlay: sky
+    gradient with a sun, and a perspective checkerboard ground. The
+    horizon follows the firmware's own quaternion (obs 6:10, wxyz, NED)
+    and the checker density follows its altitude, so every tile moves
+    with its aircraft."""
+    dev = obs.device
+    qw, qx, qy, qz = obs[:, 6], obs[:, 7], obs[:, 8], obs[:, 9]
+    roll = torch.atan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx * qx + qy * qy))
+    pitch = torch.asin((2 * (qw * qy - qz * qx)).clamp(-1.0, 1.0))
+    yaw = torch.atan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz))
+    alt = (-obs[:, 2]).clamp(1.0, 50.0)[:, None, None]
+
+    y = torch.linspace(-1.0, 1.0, h, device=dev)[None, :, None]
+    x = torch.linspace(-w / h, w / h, w, device=dev)[None, None, :]
+    cr = torch.cos(roll)[:, None, None]
+    sr = torch.sin(roll)[:, None, None]
+    d = cr * (y - 1.8 * pitch[:, None, None]) - sr * x  # >0 below horizon
+    p = sr * y + cr * x                                 # along the horizon
+
+    def col(r: float, g: float, b: float) -> "torch.Tensor":
+        return torch.tensor([r, g, b], device=dev)
+
+    # sky: zenith->horizon gradient plus a small sun placed by the
+    # aircraft's yaw — different headings put it elsewhere, or off-tile
+    a = (d.neg().clamp(0.0, 1.2) / 1.2)[..., None]
+    sky = col(150., 196., 228.) * (1 - a) + col(38., 92., 166.) * a
+    p_sun = (1.7 * torch.sin(yaw + 0.7))[:, None, None]
+    sun_r2 = (p - p_sun) ** 2 + (d + 0.42) ** 2
+    sky = sky + col(255., 244., 200.) * torch.exp(-sun_r2 / 0.0009)[..., None]
+    sky = sky + col(255., 224., 150.) * 0.3 * torch.exp(-sun_r2 / 0.008)[..., None]
+
+    # ground: perspective checkerboard, denser with altitude, hazy at the
+    # horizon (u, v blow up there; the haze hides the aliasing)
+    dg = d.clamp_min(1e-3)
+    u = p / dg
+    v = alt / (10.0 * dg)
+    checker = ((u * 1.3).floor() + (v * 1.3).floor()).remainder(2.0)[..., None]
+    ground = col(88., 124., 66.) * (1 - checker) + col(70., 104., 54.) * checker
+    haze = torch.exp(-dg / 0.12)[..., None]
+    ground = ground * (1 - haze) + col(168., 190., 204.) * haze
+
+    img = torch.where(d[..., None] < 0.0, sky, ground)
+    return img.round().clamp(0, 255).to(torch.uint8)
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,8 +96,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eeprom", default=None,
                    help="boot-ready EEPROM image (e.g. from --cli-dump): the"
                         " wall then shows that quad's own OSD layout")
-    p.add_argument("--viz3d", action="store_true",
-                   help="also open crazyflow's MuJoCo viewer on the shown tiles")
+    p.add_argument("--backdrop", action="store_true",
+                   help="draw a sky/ground horizon behind each OSD, driven by"
+                        " the instance's attitude (default: black, like a"
+                        " real OSD with no camera)")
     p.add_argument("--headless", action="store_true",
                    help="no window (SDL dummy driver); use with --screenshot")
     p.add_argument("--frames", type=int, default=0,
@@ -88,17 +138,11 @@ def main() -> int:
         f"{torch.cuda.get_device_name(env.device)}")
     clock = pygame.time.Clock()
 
-    viewer = None
-    if args.viz3d:
-        try:
-            from betaflight_gym.viz import FleetViewer
-        except ImportError:
-            sys.exit("--viz3d needs the separate betaflight-gym package")
-        viewer = FleetViewer(num_drones=show)
-
     k = torch.arange(n, device=env.device, dtype=torch.float32)
     target_alt = 4.0 + 2.0 * (k % 5) / 4.0
-    phase = 2.0 * math.pi * k / max(n, 1)
+    # golden-ratio spacing decorrelates neighbours: adjacent tiles get
+    # unrelated wiggle phases instead of a smooth gradient across the wall
+    phase = 2.0 * math.pi * torch.frac(k * 0.6180339887)
     actions = torch.zeros(n, env.act_dim, device=env.device)
     actions[:, 2] = 0.6  # initial climb
 
@@ -155,18 +199,17 @@ def main() -> int:
         env.osd_update()
         sel = (torch.arange(show, device=env.device) + offset) % n
         blink_phase = blink and (frame // max(1, args.fps // 2)) % 2 == 1
+        backdrop = (_horizon_backdrop(obs[sel], wall.rows * GLYPH_H,
+                                      wall.cols * GLYPH_W)
+                    if args.backdrop else None)
         img = wall.frame(env.osd[sel], env.osd_attrs[sel], grid=(ty, tx),
-                         blink_phase=blink_phase, scale=args.scale)
+                         blink_phase=blink_phase, scale=args.scale,
+                         background=backdrop)
         last_img = img
         arr = img.cpu().numpy()
         surf = pygame.surfarray.make_surface(arr.swapaxes(0, 1))
         screen.blit(surf, (0, 0))
         pygame.display.flip()
-
-        if viewer is not None:
-            pos = obs[sel, 0:3].cpu().numpy()
-            quat = obs[sel, 6:10].cpu().numpy()
-            viewer.update(pos, quat)
 
         clock.tick(args.fps)
         frame += 1
@@ -176,8 +219,6 @@ def main() -> int:
         Image.fromarray(last_img.cpu().numpy()).save(args.screenshot)
         print(f"[wall] screenshot -> {args.screenshot}")
 
-    if viewer is not None:
-        viewer.close()
     pygame.quit()
     env.close()
     return 0

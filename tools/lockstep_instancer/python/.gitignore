@@ -1,9 +1,5 @@
 build/
 dist/
 *.egg-info/
-src/cudaflight/_data/libcudaflight.so
-src/cudaflight/_data/libcpuflight.so
-src/cudaflight/_data/fw.fatbin
-src/cudaflight/_data/fw.cubin
-src/cudaflight/_data/font_betaflight.c
+src/cudaflight/_data/
 __pycache__/
